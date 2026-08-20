@@ -187,6 +187,10 @@
   row-gap: 2.4rem;
 }
 
+/* js/contact.js swaps form ↔ success by toggling [hidden]; the UA's
+   [hidden] { display: none } loses to the class rule above, so restate it. */
+.contact__form[hidden] { display: none; }
+
 .contact__field {
   display: flex;
   flex-direction: column;
@@ -310,7 +314,7 @@
   cursor: default;
 }
 
-/* ---------- success state (front-end only — no request is ever made) ---------- */
+/* ---------- handed-off state (no request is ever made — a mailto: draft) ---------- */
 .contact__success-title {
   font-size: clamp(2rem, 3.5vw, 2.75rem);
 }

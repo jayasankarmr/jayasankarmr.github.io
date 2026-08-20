@@ -278,12 +278,15 @@
         </div>
 
         <div class="contact__formwrap">
-          <!-- front-end only: js/contact.js intercepts submit, no request is made.
-               WARNING before going live: nothing is sent anywhere and the visitor's
-               message is discarded, while the success panel below implies delivery.
-               Either wire this to a form service (Formspree / Netlify Forms / EmailJS)
-               or reword the success copy so it does not promise a reply. -->
-          <form class="contact__form" data-contact-form data-reveal>
+          <!-- no backend by design: js/contact.js turns a valid submit into a
+               mailto: draft addressed to data-mailto below, opened in the
+               visitor's own mail app. Nothing is posted anywhere, so there is
+               no endpoint to spam and no third-party form key in the page.
+               The visitor's own account supplies the From address — hence no
+               email field. Keep the address here (not in the JS) so the markup
+               stays the single source of truth for it. -->
+          <form class="contact__form" data-contact-form data-reveal
+                data-mailto="jayasankar.mr7@gmail.com">
             <div class="contact__field">
               <label for="c-name">Name</label>
               <input id="c-name" name="name" type="text" autocomplete="name" required
@@ -293,15 +296,6 @@
             </div>
 
             <div class="contact__field">
-              <label for="c-email">Email</label>
-              <input id="c-email" name="email" type="email" autocomplete="email" required
-                     aria-describedby="c-email-error"
-                     data-err-required="Please add your email address."
-                     data-err-type="That address doesn’t look quite right.">
-              <p class="contact__field-error" id="c-email-error" hidden></p>
-            </div>
-
-            <div class="contact__field contact__field--wide">
               <label for="c-subject">Subject</label>
               <span class="contact__select-wrap">
                 <select id="c-subject" name="subject" required
@@ -320,7 +314,10 @@
 
             <div class="contact__field contact__field--wide">
               <label for="c-message">Message</label>
-              <textarea id="c-message" name="message" rows="5" required
+              <!-- capped: the whole draft travels inside a mailto: URL, and some
+                   OS mail handlers (Windows especially) drop anything past ~2000
+                   characters. Better a visible stop than a silently cut message. -->
+              <textarea id="c-message" name="message" rows="5" required maxlength="1200"
                         aria-describedby="c-message-error"
                         data-err-required="A few words will do — the message is empty."></textarea>
               <p class="contact__field-error" id="c-message-error" hidden></p>
@@ -328,18 +325,20 @@
 
             <div class="contact__actions">
               <button class="contact__submit" type="submit" data-submit>
-                <span data-submit-label>Send message</span>
+                <span data-submit-label>Open in your mail app</span>
                 <span class="contact__submit-arrow" aria-hidden="true">&#8594;</span>
               </button>
             </div>
           </form>
 
-          <!-- swapped in by js/contact.js after a valid submit -->
+          <!-- swapped in by js/contact.js once the draft has been handed off.
+               Keeps the address in plain sight: a mailto: can fail silently if
+               the visitor has no mail handler set, and this is their way out. -->
           <div class="contact__success" data-contact-success hidden>
-            <h3 class="contact__success-title" data-success-title tabindex="-1">Thank <em>you</em>.</h3>
-            <p class="contact__success-text">Thank you for reaching out. This form isn’t wired up to send messages just yet — please drop me a line directly at the email above and I’ll be sure to see it.</p>
+            <h3 class="contact__success-title" data-success-title tabindex="-1">Over to <em>you</em>.</h3>
+            <p class="contact__success-text">Your draft is waiting in your mail app — add anything else you’d like, then send it my way. If nothing opened, write to <a href="mailto:jayasankar.mr7@gmail.com">jayasankar.mr7@gmail.com</a> and I’ll see it just the same.</p>
             <p class="contact__success-sign">— J.</p>
-            <button class="contact__again" type="button" data-contact-again>Write another note</button>
+            <button class="contact__again" type="button" data-contact-again>Start another draft</button>
           </div>
         </div>
       </div>
