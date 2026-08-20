@@ -172,6 +172,30 @@ section[id] { scroll-margin-top: var(--header-h); }
 .site-header__nav a:hover::after,
 .site-header__nav a:focus-visible::after { transform: scaleX(1); }
 
+/* mobile: the brand is a single-line wordmark — at desktop size it wrapped to
+   two lines and spilled over the nav. Tighten the name and the nav links just
+   enough that both sit on one row down to a 320px viewport. */
+@media (max-width: 767px) {
+  .site-header { gap: 0.75rem; }
+
+  .site-header__brand {
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .site-header__nav {
+    flex: none;
+    gap: 1rem;
+  }
+
+  .site-header__nav a {
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+  }
+}
+
 /* ---------- Shared ghost frame ----------
    Hairline outline that mirrors an image's box and sits behind it, nudged
    off-axis so the photograph overlaps two of its edges (about portrait +
