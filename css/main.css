@@ -1,0 +1,242 @@
+/* ==========================================================================
+   main.css — shared foundation: reset, design tokens, typography, site chrome
+   ========================================================================== */
+
+/* ---------- Reset ---------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+* { margin: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+img,
+picture,
+video { display: block; max-width: 100%; }
+
+input,
+button,
+textarea,
+select { font: inherit; }
+
+a { color: inherit; }
+
+/* ---------- Design tokens ---------- */
+:root {
+  /* color — dark editorial palette */
+  --bg: #0a0a0a;
+  --bg-elevated: #121210;
+  --ink: #f2efe9;                          /* warm off-white */
+  --ink-muted: rgba(242, 239, 233, 0.62);
+  --ink-faint: rgba(242, 239, 233, 0.38);
+  --hairline: rgba(242, 239, 233, 0.16);
+  --accent: #c8b493;                       /* muted champagne — use sparingly */
+
+  /* type */
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-body: 1rem;
+  --step-display: clamp(3rem, 9vw, 6.75rem);
+
+  /* layout */
+  --space-gutter: clamp(1.25rem, 4vw, 3rem);
+  --header-h: 4.5rem;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Base ---------- */
+html {
+  background: var(--bg);
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  scrollbar-width: none;    /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+/* Hide the scrollbar everywhere — scrolling stays fully functional via
+   wheel, trackpad, keyboard and touch. Chrome/Safari/Edge. */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+::selection { background: var(--accent); color: var(--bg); }
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Anchor targets stop short of the fixed header */
+section[id] { scroll-margin-top: var(--header-h); }
+
+/* ---------- Skip link ---------- */
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible { transform: none; }
+
+/* ---------- Site header / nav ---------- */
+.site-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: 0 var(--space-gutter);
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
+/* .is-scrolled is toggled by js/main.js once the page scrolls past the top */
+.site-header.is-scrolled {
+  background: rgba(10, 10, 10, 0.72);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom-color: var(--hairline);
+}
+
+.site-header__brand {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.site-header__nav {
+  display: flex;
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.site-header__nav a {
+  position: relative;
+  padding: 0.25rem 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink-muted);
+  transition: color 0.3s ease;
+}
+
+.site-header__nav a:hover { color: var(--ink); }
+
+/* hairline underline that draws in from the left */
+.site-header__nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease-out);
+}
+
+.site-header__nav a:hover::after,
+.site-header__nav a:focus-visible::after { transform: scaleX(1); }
+
+/* ---------- Shared ghost frame ----------
+   Hairline outline that mirrors an image's box and sits behind it, nudged
+   off-axis so the photograph overlaps two of its edges (about portrait +
+   every gallery figure).
+   Host contract: the parent is position:relative and sized exactly to the
+   image box (a bare media wrapper — not the caption), and the image's own
+   wrapper is positioned so it paints over the frame.
+   The offset is inset-based rather than a transform, which leaves `transform`
+   free for the parallax engine: nest the frame inside a [data-speed] figure
+   and its own data-speed reads as the relative depth gap between the two.
+   Direction, per instance: --ghost-dx  1 = right, -1 = left
+                            --ghost-dy -1 = up,    1 = down
+   ------------------------------------------------------------------------ */
+.ghost-frame {
+  /* stays inside the page gutter at every desktop width, so the offset edge
+     never clips against the viewport */
+  --ghost-shift: clamp(1rem, 2vw, 2rem);
+  --ghost-dx: 1;
+  --ghost-dy: -1;
+
+  position: absolute;
+  top:    calc(var(--ghost-shift) * var(--ghost-dy));
+  bottom: calc(var(--ghost-shift) * var(--ghost-dy) * -1);
+  left:   calc(var(--ghost-shift) * var(--ghost-dx));
+  right:  calc(var(--ghost-shift) * var(--ghost-dx) * -1);
+  border: 1px solid var(--hairline);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* mobile: figures run the full content width, so an offset frame would clip
+   against the viewport edge (parallax is off there too — js/main.js) */
+@media (max-width: 767px) {
+  .ghost-frame { display: none; }
+}
+
+/* ---------- Shared reveal-on-scroll (Portfolio.observeReveals) ----------
+   Children of a [data-reveal] element rise + fade in when .is-inview lands.
+   Hidden state is gated on html.js and motion preference, so content is
+   never lost without JS or under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html.js [data-reveal] > * {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out);
+  }
+
+  html.js [data-reveal] > :nth-child(2) { transition-delay: 0.1s; }
+  html.js [data-reveal] > :nth-child(3) { transition-delay: 0.2s; }
+
+  html.js [data-reveal].is-inview > * {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Reduced motion: static fallback site-wide ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jayasankar M R — Photographer</title>
+  <meta name="description" content="Portfolio of photographer Jayasankar M R — travel, architecture, wildlife and street work exploring light, shadow, and the moments in between.">
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="%230a0a0a"/><circle cx="32" cy="32" r="11" fill="%23c8b493"/></svg>'>
+
+  <!-- Social share preview. og:image and twitter:image must be absolute URLs,
+       so they are spelled out against the deployed origin rather than relative. -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Jayasankar M R — Photographer">
+  <meta property="og:description" content="Portfolio of photographer Jayasankar M R — travel, architecture, wildlife and street work exploring light, shadow, and the moments in between.">
+  <meta property="og:url" content="https://jayasankarmr.github.io/Photography-Portfolio/">
+  <meta property="og:image" content="https://jayasankarmr.github.io/Photography-Portfolio/images/hero.jpg">
+  <meta property="og:image:alt" content="Portfolio of photographer Jayasankar M R — travel, architecture, wildlife and street work exploring light, shadow, and the moments in between.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Jayasankar M R — Photographer">
+  <meta name="twitter:description" content="Portfolio of photographer Jayasankar M R — travel, architecture, wildlife and street work exploring light, shadow, and the moments in between.">
+  <meta name="twitter:image" content="https://jayasankarmr.github.io/Photography-Portfolio/images/hero.jpg">
+
+  <!-- Site-wide typography pairing (see TASK.md notes): Cormorant Garamond (display) + Inter (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/hero.css">
+  <link rel="stylesheet" href="css/gallery.css">
+  <link rel="stylesheet" href="css/about.css">
+  <link rel="stylesheet" href="css/contact.css">
+</head>
+<body>
+  <a class="skip-link" href="#hero">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <a class="site-header__brand" href="#hero">Jayasankar M R</a>
+    <nav class="site-header__nav" aria-label="Primary">
+      <a href="#gallery">Work</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ================= 1. HERO ================= -->
+    <section id="hero" class="hero" aria-label="Introduction">
+      <div class="hero__media" data-hero-media aria-hidden="true">
+        <img
+          src="images/hero.jpg"
+          alt=""
+          decoding="async"
+          fetchpriority="high">
+      </div>
+      <div class="hero__scrim" aria-hidden="true"></div>
+
+      <div class="hero__content" data-hero-content>
+        <p class="hero__kicker">Photographer — Kerala, India</p>
+        <!-- short form on the hero only; the full name stays in the header
+             brand, the footer and the page/social metadata -->
+        <h1 class="hero__title">Jay</h1>
+        <p class="hero__tagline">A moment simply arrives,<br>I try to be ready for it.</p>
+      </div>
+
+      <div class="hero__scroll-cue" aria-hidden="true">
+        <span>Scroll</span>
+      </div>
+    </section>
+
+    <!-- ================= 2. GALLERY ================= -->
+    <section id="gallery" class="gallery" aria-label="Selected work">
+      <!-- huge, near-invisible serif fragments drifting behind the figures -->
+      <div class="gallery__depth" aria-hidden="true">
+        <span class="gallery__word gallery__word--1" data-speed="-0.16">light,</span>
+        <span class="gallery__word gallery__word--2" data-speed="-0.22">shadow</span>
+      </div>
+
+      <div class="gallery__grid">
+        <header class="gallery__head" data-reveal>
+          <p class="gallery__kicker">Selected Frames</p>
+          <h2 class="gallery__title">Between light <em>and shadow</em></h2>
+        </header>
+
+        <figure class="gallery__item gallery__item--1" data-speed="0.07" data-reveal>
+          <!-- hairline frame lags one depth step behind the photo (css/main.css) -->
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-01-full.jpg"
+                    aria-label="View “Ember” larger">
+              <img src="images/gallery-01.jpg"
+                   width="933" height="1400" alt="Glowing embers at the heart of a Lohri bonfire" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">01</span>
+            <span class="gallery__caption-title">Ember</span>
+            <span class="gallery__caption-meta">Lohri bonfire, North India</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item gallery__item--2" data-speed="-0.09" data-reveal>
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-02-full.jpg"
+                    aria-label="View “Departure” larger">
+              <img src="images/gallery-02.jpg"
+                   width="1400" height="933" alt="Delhi Metro's Red Line silhouetted against a burning sunset" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">02</span>
+            <span class="gallery__caption-title">Departure</span>
+            <span class="gallery__caption-meta">Red Line, New Delhi</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item gallery__item--3" data-speed="0.11" data-reveal>
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-03-full.jpg"
+                    aria-label="View “Transmission” larger">
+              <img src="images/gallery-03.jpg"
+                   width="866" height="1400" alt="Power line tower with the sun caught perfectly in its lattice" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">03</span>
+            <span class="gallery__caption-title">Transmission</span>
+            <span class="gallery__caption-meta">An unplanned alignment, second floor</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item gallery__item--4" data-speed="-0.06" data-reveal>
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-04-full.jpg"
+                    aria-label="View “Unseen” larger">
+              <img src="images/gallery-04.jpg"
+                   width="1400" height="957" alt="Peacock in shadowed undergrowth on Machla Magra Hill, Udaipur" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">04</span>
+            <span class="gallery__caption-title">Unseen</span>
+            <span class="gallery__caption-meta">Machla Magra Hill, Udaipur</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item gallery__item--5" data-speed="0.09" data-reveal>
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-05-full.jpg"
+                    aria-label="View “Crown” larger">
+              <img src="images/gallery-05.jpg"
+                   width="1050" height="1400" alt="Ornate white marble dome within Udaipur's City Palace" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">05</span>
+            <span class="gallery__caption-title">Crown</span>
+            <span class="gallery__caption-meta">City Palace, Udaipur</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item gallery__item--6" data-speed="-0.11" data-reveal>
+          <div class="gallery__media">
+            <span class="ghost-frame" data-speed="-0.05" aria-hidden="true"></span>
+            <button class="gallery__frame" type="button" data-lightbox
+                    data-full="images/gallery-06-full.jpg"
+                    aria-label="View “Pulse” larger">
+              <img src="images/gallery-06.jpg"
+                   width="1400" height="933" alt="Concert stage lit in red and gold, crowd silhouetted in haze" loading="lazy" decoding="async">
+            </button>
+          </div>
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-index">06</span>
+            <span class="gallery__caption-title">Pulse</span>
+            <span class="gallery__caption-meta">One last DJ night, campus</span>
+          </figcaption>
+        </figure>
+      </div>
+
+      <!-- lightbox — native <dialog>: top layer, Esc + focus handling for free -->
+      <dialog class="lightbox" id="lightbox" aria-label="Expanded image viewer">
+        <button class="lightbox__ctrl lightbox__close" type="button" data-lightbox-close aria-label="Close viewer">&#215;</button>
+        <button class="lightbox__ctrl lightbox__prev" type="button" data-lightbox-prev aria-label="Previous image">&#8592;</button>
+        <button class="lightbox__ctrl lightbox__next" type="button" data-lightbox-next aria-label="Next image">&#8594;</button>
+        <figure class="lightbox__figure">
+          <img class="lightbox__img" alt="" decoding="async">
+          <figcaption class="lightbox__caption">
+            <span class="lightbox__count" data-lightbox-count></span>
+            <span class="lightbox__title" data-lightbox-title></span>
+            <span class="lightbox__meta" data-lightbox-meta></span>
+          </figcaption>
+        </figure>
+      </dialog>
+    </section>
+
+    <!-- ================= 3. ABOUT ================= -->
+    <section id="about" class="about" aria-label="About Jayasankar M R">
+      <!-- parallax-shifted backdrop: soft champagne wash drifting behind the text -->
+      <div class="about__backdrop" aria-hidden="true">
+        <div class="about__wash" data-speed="-0.12"></div>
+      </div>
+
+      <div class="about__grid">
+        <div class="about__media">
+          <figure class="about__portrait" data-speed="0.06" data-reveal>
+            <div class="about__portrait-media">
+              <!-- hairline frame lags behind the portrait, opening the depth gap.
+                   −0.11 here composes with the figure's +0.06 → −0.05 on the page. -->
+              <span class="ghost-frame" data-speed="-0.11" aria-hidden="true"></span>
+              <span class="about__portrait-frame">
+                <img src="images/portrait.jpg"
+                     width="1200" height="1600" alt="Cluster of hanging Edison bulbs glowing above an airport restaurant"
+                     loading="lazy" decoding="async">
+              </span>
+            </div>
+            <figcaption class="about__portrait-caption">A hundred small suns, caught somewhere between one flight and the next</figcaption>
+          </figure>
+        </div>
+
+        <div class="about__body" data-reveal>
+          <p class="about__kicker">About</p>
+          <h2 class="about__title">On chasing <em>light</em></h2>
+          <p class="about__lede">I don’t chase perfect light — I wait for the moment it turns honest.</p>
+          <p class="about__text">I’m a photographer based in Kerala, working across travel, architecture, wildlife and street — wherever a scene asks to be looked at twice. My camera has taken me from quiet forest undergrowth to crowded concert floors, from centuries-old palace domes to the ordinary hum of a railway overpass at dusk. What draws me in changes by the day; the instinct to stop and notice doesn’t.</p>
+          <p class="about__text">I shoot instinctively rather than to a plan — walking until something insists on being photographed, then waiting for the light, the gesture, or the silhouette to fall into place. Fire, dusk, shadow and stillness turn up again and again in the work; I’m drawn to the moment before things resolve, when a frame could still go either way. Every photograph here started with five minutes of standing still and paying attention.</p>
+          <dl class="about__facts">
+            <div class="about__fact">
+              <dt>Based in</dt>
+              <dd>Kerala, India</dd>
+            </div>
+            <div class="about__fact">
+              <dt>Focus</dt>
+              <dd>Travel · Architecture · Wildlife · Street</dd>
+            </div>
+            <div class="about__fact">
+              <dt>Drawn to</dt>
+              <dd>Silhouettes, dusk light, quiet corners</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 4. CONTACT ================= -->
+    <section id="contact" class="contact" aria-label="Contact">
+      <!-- deepest layer: the tagline's last fragment — gallery drifted "light," and "distance" -->
+      <div class="contact__depth" aria-hidden="true">
+        <span class="contact__word" data-speed="-0.18">afterglow</span>
+        <div class="contact__wash" data-speed="-0.07"></div>
+      </div>
+
+      <div class="contact__grid">
+        <header class="contact__head" data-reveal>
+          <p class="contact__kicker">Contact</p>
+          <h2 class="contact__title">Start a <em>conversation</em></h2>
+        </header>
+
+        <div class="contact__info" data-reveal>
+          <p class="contact__note">Whether it’s a shared frame, a project, or just a word about the work — I’d love to hear from you. I read every message myself.</p>
+          <a class="contact__email" href="mailto:jayasankar.mr7@gmail.com">jayasankar.mr7@gmail.com</a>
+          <ul class="contact__socials">
+            <li>
+              <a href="https://www.instagram.com/jayasankar.mr/" target="_blank" rel="noopener">
+                <span class="contact__social-name">Instagram</span>
+                <span class="contact__social-handle">@jayasankar.mr <span class="contact__social-arrow" aria-hidden="true">&#8599;</span></span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="contact__formwrap">
+          <!-- front-end only: js/contact.js intercepts submit, no request is made.
+               WARNING before going live: nothing is sent anywhere and the visitor's
+               message is discarded, while the success panel below implies delivery.
+               Either wire this to a form service (Formspree / Netlify Forms / EmailJS)
+               or reword the success copy so it does not promise a reply. -->
+          <form class="contact__form" data-contact-form data-reveal>
+            <div class="contact__field">
+              <label for="c-name">Name</label>
+              <input id="c-name" name="name" type="text" autocomplete="name" required
+                     aria-describedby="c-name-error"
+                     data-err-required="Please add your name.">
+              <p class="contact__field-error" id="c-name-error" hidden></p>
+            </div>
+
+            <div class="contact__field">
+              <label for="c-email">Email</label>
+              <input id="c-email" name="email" type="email" autocomplete="email" required
+                     aria-describedby="c-email-error"
+                     data-err-required="Please add your email address."
+                     data-err-type="That address doesn’t look quite right.">
+              <p class="contact__field-error" id="c-email-error" hidden></p>
+            </div>
+
+            <div class="contact__field contact__field--wide">
+              <label for="c-subject">Subject</label>
+              <span class="contact__select-wrap">
+                <select id="c-subject" name="subject" required
+                        aria-describedby="c-subject-error"
+                        data-err-required="Please choose a subject.">
+                  <option value="" selected disabled>Choose a subject…</option>
+                  <option>Say hello</option>
+                  <option>Collaboration</option>
+                  <option>Licensing or usage</option>
+                  <option>Something else</option>
+                </select>
+                <span class="contact__select-arrow" aria-hidden="true">&#8595;</span>
+              </span>
+              <p class="contact__field-error" id="c-subject-error" hidden></p>
+            </div>
+
+            <div class="contact__field contact__field--wide">
+              <label for="c-message">Message</label>
+              <textarea id="c-message" name="message" rows="5" required
+                        aria-describedby="c-message-error"
+                        data-err-required="A few words will do — the message is empty."></textarea>
+              <p class="contact__field-error" id="c-message-error" hidden></p>
+            </div>
+
+            <div class="contact__actions">
+              <button class="contact__submit" type="submit" data-submit>
+                <span data-submit-label>Send message</span>
+                <span class="contact__submit-arrow" aria-hidden="true">&#8594;</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- swapped in by js/contact.js after a valid submit -->
+          <div class="contact__success" data-contact-success hidden>
+            <h3 class="contact__success-title" data-success-title tabindex="-1">Thank <em>you</em>.</h3>
+            <p class="contact__success-text">Thank you for reaching out. This form isn’t wired up to send messages just yet — please drop me a line directly at the email above and I’ll be sure to see it.</p>
+            <p class="contact__success-sign">— J.</p>
+            <button class="contact__again" type="button" data-contact-again>Write another note</button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="contact__footer">
+        <p class="contact__footer-note">© 2026 Jayasankar M R · Kerala</p>
+        <a class="contact__top" href="#hero">Back to top <span class="contact__top-arrow" aria-hidden="true">&#8593;</span></a>
+      </footer>
+    </section>
+  </main>
+
+  <script src="js/main.js" defer></script>
+  <script src="js/hero.js" defer></script>
+  <script src="js/gallery.js" defer></script>
+  <script src="js/about.js" defer></script>
+  <script src="js/contact.js" defer></script>
+</body>
+</html>

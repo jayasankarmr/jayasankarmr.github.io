@@ -1,0 +1,19 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# Vite dep-optimizer cache (stray - this project has no build step)
+.vite/
+
+# Camera originals: kept locally, never published (~82 MB, unreferenced by the site)
+/DSC*.jpg
+/DSC*.JPG
+/IMG_*.jpg
+
+# Authoring notes and tooling - local only
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+TASK.md
+CONTENT.md
