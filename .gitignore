@@ -20,3 +20,7 @@ CONTENT.md
 
 # Astro
 .astro/
+
+# Revamp working notes, screenshots and metrics - local only
+.revamp/
+TODO_CONTENT.md
