@@ -2,7 +2,7 @@
 // Every material shares one set of uniform objects (time, sun, intro, unroll…), so the
 // director writes each value once per frame.
 import {
-  AddEquation, BackSide, BufferAttribute, BufferGeometry, Color, CustomBlending, InstancedBufferAttribute,
+  AddEquation, BackSide, BufferAttribute, DoubleSide, BufferGeometry, Color, CustomBlending, InstancedBufferAttribute,
   InstancedBufferGeometry, Mesh, NormalBlending, OneFactor, ShaderMaterial, SphereGeometry, Vector2, Vector3, Vector4,
   ZeroFactor,
 } from "three";
@@ -48,7 +48,7 @@ const col = (hex: string) => new Color(hex);
  * canvas — without writing alpha (which would turn empty space opaque black). Shaders using it
  * output premultiplied colour.
  */
-const ADDITIVE = {
+export const ADDITIVE = {
   blending: CustomBlending, blendEquation: AddEquation,
   blendSrc: OneFactor, blendDst: OneFactor, blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,
 } as const;
@@ -122,7 +122,8 @@ export class World {
     const stars = new Mesh(instanced({ aDir: [dir, 3], aMeta: [sm, 4] }, n), new ShaderMaterial({
       vertexShader: common + starsVert, fragmentShader: starsFrag,
       uniforms: { ...this.u, uStreak: { value: new Vector2() }, uColor: { value: col(PALETTE.stars) } },
-      transparent: true, depthTest: false, depthWrite: false, ...ADDITIVE,
+      // streak quads are built along the velocity, so their winding follows its direction
+      side: DoubleSide, transparent: true, depthTest: false, depthWrite: false, ...ADDITIVE,
     }));
     stars.renderOrder = -10;
     stars.frustumCulled = false;

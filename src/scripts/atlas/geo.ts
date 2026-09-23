@@ -129,9 +129,13 @@ export function subsolar(date = new Date()): { lat: number; lng: number } {
   return { lat: dec, lng };
 }
 
-/** Arc apex height (globe radii) for a leg: a hop for neighbours, a high sweep across seas. */
+/**
+ * Arc apex height (globe radii) for a leg: sub-linear in length, so a neighbouring hop stays a
+ * gentle arch (Prayagraj → Varanasi ≈ 25 km up over 111 km) while a sea crossing sweeps high
+ * (Jaipur → Phuket ≈ 1,600 km up). Overland legs hug the ground.
+ */
 export const arcHeight = (angle: number, overland: boolean) =>
-  overland ? 0.0025 + 0.02 * angle : Math.min(0.32, 0.012 + 0.3 * angle);
+  overland ? 0.002 + 0.02 * angle : Math.min(0.32, 0.32 * Math.pow(angle / 0.6, 1.25));
 
 export const formatCoord = (lat: number, lng: number, digits = 2) =>
   `${Math.abs(lat).toFixed(digits)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lng).toFixed(digits)}°${lng >= 0 ? "E" : "W"}`;

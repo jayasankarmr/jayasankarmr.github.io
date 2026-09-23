@@ -1,7 +1,7 @@
 // Motion tokens for the atlas: every easing curve, duration, stagger and scroll length the
 // home page uses lives here. GSAP gets the curves as named eases ("atlas.out", …); CSS gets
 // them as custom properties (base.css carries the same values as no-JS fallbacks).
-import { gsap } from "../motion/smooth";
+// Pure (no imports), so Astro can size the journey from the same numbers at build time.
 
 type Bezier = readonly [number, number, number, number];
 
@@ -40,9 +40,9 @@ export const scroll = {
   /** hero → first stop dive */
   heroOut: 0.6,
   /** one stop segment (dwell + the leg that follows it) */
-  stop: { wide: 0.75, compact: 0.6 },
-  /** extra scroll per radian of leg length, so long flights feel long */
-  perRadian: 0.9,
+  stop: { wide: 0.62, compact: 0.5 },
+  /** extra scroll per radian of leg length, so long flights feel long (in stop units) */
+  perRadian: 1.4,
   /** share of a segment spent landed at the stop */
   dwell: 0.42,
   /** sphere → map unroll */
@@ -98,7 +98,7 @@ export const cssBezier = (c: Bezier) => `cubic-bezier(${c.join(", ")})`;
 
 let registered = false;
 /** Registers the curves as GSAP eases ("atlas.out", …) and syncs the CSS custom properties. */
-export function registerMotion() {
+export function registerMotion(gsap: { registerEase(name: string, fn: (t: number) => number): void }) {
   if (registered) return;
   registered = true;
   for (const [name, fn] of Object.entries(ease)) gsap.registerEase(`atlas.${name}`, fn);

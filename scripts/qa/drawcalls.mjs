@@ -23,7 +23,11 @@ const measure = async (label) => {
   console.log(label.padEnd(10), "draw calls/frame", ((z[0] - a[0]) / (z[1] - a[1])).toFixed(1), "· draws in 2s", z[0] - a[0], "· canvas", canvas);
 };
 await measure("hero");
-await p.evaluate(() => { const s = document.querySelectorAll("[data-stop]")[18]; scrollTo(0, scrollY + s.getBoundingClientRect().top - innerHeight * 0.5); });
+await p.evaluate(() => {
+  if (window.__atlasQA) { window.__atlasQA.noSnap = true; return scrollTo(0, window.__atlasQA.stopY(window.__atlasQA.stops - 1)); }
+  const s = document.querySelectorAll("[data-stop]")[18];
+  scrollTo(0, scrollY + s.getBoundingClientRect().top - innerHeight * 0.5);
+});
 await p.waitForTimeout(2500); await measure("stop 19");
 await p.evaluate(() => scrollTo(0, document.body.scrollHeight)); await p.waitForTimeout(2500); await measure("footer");
 await b.close();

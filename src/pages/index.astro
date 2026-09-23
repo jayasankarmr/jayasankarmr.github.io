@@ -10,6 +10,7 @@ import { site } from "../data/site";
 import { places, type Place } from "../data/travel";
 import { concerts } from "../data/concerts";
 import { now, interests } from "../data/now";
+import { buildLegs, formatKm } from "../scripts/atlas/journey";
 
 const posts = (await getCollection("writing", ({ data }) => !data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 const coord = (lat: number, lng: number) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? "E" : "W"}`;
@@ -19,6 +20,18 @@ const real = places.filter((p) => !p.placeholder).length;
 const dated = (p: Place) => p.when ? (p.recurring ? `Since ${when(p.when)} · on repeat` : when(p.when)) : null;
 const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocaleDateString("en-GB", d.length === 7 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric" });
 const cities = new Set(concerts.map((c) => c.city)).size;
+
+// journey: legs, trips and distances come from the data (src/scripts/atlas/journey.ts)
+const legs = buildLegs(places);
+const n = places.length;
+const railY = (i: number) => (i / (n - 1)) * 1000;
+// the rail is a flight path: stops sit on x = 30 of a 40 × 1000 box, each leg bowing left by its arc height
+const railPath = legs.reduce((d, l, k) => {
+  const bow = Math.min(1, l.height / 0.18) * 26;
+  return d + `Q${(30 - bow * 2).toFixed(2)} ${((railY(k) + railY(k + 1)) / 2).toFixed(1)} 30 ${railY(k + 1).toFixed(1)}`;
+}, "M30 0");
+const MODE = { flight: "By air", train: "By train", road: "By road", bus: "By bus", ferry: "By ferry" } as const;
+const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat, lng: p.lng, when: p.when && when(p.when), recurring: !!p.recurring, home: !!p.home, leg: !!p.leg }));
 ---
 <Base
   title="Jayasankar M R — engineer & photographer"
@@ -36,14 +49,7 @@ const cities = new Set(concerts.map((c) => c.city)).size;
   </div>
 
   <canvas class="at-globe" data-globe aria-hidden="true"></canvas>
-  <div class="at-labels" data-labels aria-hidden="true">
-    {places.map((p, i) => (
-      <div class:list={["at-label", { "is-tba": p.placeholder }]} data-label={i}>
-        <span class="at-label__name">{p.name}</span>
-        {p.photo && <img src={p.photo} alt="" loading="lazy" decoding="async" />}
-      </div>
-    ))}
-  </div>
+  <div class="lbls" data-labels aria-hidden="true"></div>
 
   <SiteNav current="home"><span data-pos>{coord(places[0].lat, places[0].lng)} · {places[0].name}</span></SiteNav>
 
@@ -77,25 +83,81 @@ const cities = new Set(concerts.map((c) => c.city)).size;
     </section>
 
     <!-- ============ JOURNEY ============ -->
-    <section class="at-journey" id="journey" aria-label="Journey">
-      <div class="at-rail" aria-hidden="true"><span class="at-rail__fill" data-rail-fill></span></div>
-      {places.map((p, i) => (
-        <article class:list={["at-stop", { "is-tba": p.placeholder }]} data-stop={i} data-lat={p.lat} data-lng={p.lng} data-name={p.name} data-leg={p.leg ? "" : undefined} data-recurring={p.recurring ? "" : undefined} data-home={p.home ? "" : undefined}>
-          <div class="at-stop__inner">
-          <span class="at-stop__node" aria-hidden="true"></span>
-          <div class="at-stop__card">
-            <p class="at-mono at-kicker">Stop {pad(i + 1)} / {pad(places.length)} · {p.home ? "Home" : dated(p) ?? p.region}</p>
-            <h2 class="at-stop__name">{p.name}</h2>
-            <div class="at-stop__more"><div>
-              <p class="at-mono at-stop__coord">{p.placeholder ? p.region : coord(p.lat, p.lng)}</p>
-              <p class="at-stop__note">{p.note}</p>
-              {p.link && <a class="at-stop__link at-mono" href={p.link} target="_blank" rel="noopener">See the trip ↗</a>}
-              {p.photo && <img class="at-stop__photo" src={p.photo} alt={`Photograph from ${p.name}`} loading="lazy" decoding="async" />}
-            </div></div>
+    <section class="jr" id="journey" aria-labelledby="jr-title" data-journey data-stops={JSON.stringify(stopData)}>
+      <h2 id="jr-title" class="sr-only">Journey</h2>
+      <!-- the journey for screen readers: every stop, in order (the visual deck mirrors it) -->
+      <ol class="jr-sr sr-only" role="list">
+        {places.map((p, i) => (
+          <li>
+            <h3>Stop {i + 1} of {n}: {p.name}</h3>
+            <p>{p.region}. {p.home ? "Home." : dated(p) ? `${dated(p)}.` : ""} {coord(p.lat, p.lng)}.{i > 0 && ` ${formatKm(legs[i - 1].km)} from ${places[i - 1].name}${legs[i - 1].overland ? ", overland" : ""}.`}</p>
+            <p>{p.note}</p>
+            {p.link && <a href={p.link} target="_blank" rel="noopener">See the trip to {p.name}</a>}
+          </li>
+        ))}
+      </ol>
+      <div class="jr__track" data-track>
+        {places.map((_, i) => <span class="jr__snap" data-snap={i} aria-hidden="true"></span>)}
+        <div class="jr__stage" data-stage>
+          <nav class="jr-rail" data-rail aria-label="Journey stops">
+            <svg class="jr-rail__path" viewBox="0 0 40 1000" preserveAspectRatio="none" aria-hidden="true">
+              <path class="jr-rail__route" d={railPath} vector-effect="non-scaling-stroke" />
+              <path class="jr-rail__flown" data-rail-fill d="M30 0" vector-effect="non-scaling-stroke" />
+            </svg>
+            <ol class="jr-rail__stops" role="list">
+              {places.map((p, i) => (
+                <li style={`--at: ${((i / (n - 1)) * 100).toFixed(3)}%`}>
+                  <button type="button" class="jr-rail__stop" data-rail-stop={i} tabindex={i === 0 ? 0 : -1}>
+                    <span class="jr-rail__node" aria-hidden="true"></span>
+                    <span class="sr-only">Stop {i + 1}: </span>
+                    <span class="jr-rail__name">{p.name}</span>
+                    <span class="jr-rail__date">{p.home ? "Home" : p.when ? when(p.when) : ""}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+            <span class="jr-rail__plane" data-rail-plane aria-hidden="true">
+              <svg viewBox="0 0 16 16"><path d="M8 1.5 9.6 7l4.9 2.4v1.4L9.6 9.4 9.2 12.6l1.6 1.2V15L8 14.2 5.2 15v-1.2l1.6-1.2-.4-3.2-4.9 1.4V9.4L6.4 7Z" fill="currentColor" /></svg>
+              <span class="jr-rail__alt at-mono" data-rail-alt>Alt —</span>
+            </span>
+          </nav>
+          <div class="jr-deck" data-deck aria-hidden="true">
+            {places.map((p, i) => {
+              const leg = i > 0 ? legs[i - 1] : null;
+              return (
+                <article class:list={["pass", { "is-home": p.home, "is-tba": p.placeholder, "is-current": i === 0 }]} data-card={i}>
+                  <div class="pass__face">
+                    <header class="pass__head">
+                      <p class="pass__no at-mono">Stop <b>{pad(i + 1)}</b> / {pad(n)}</p>
+                      <p class="pass__when at-mono">{p.home ? "Home" : dated(p) ?? p.region}</p>
+                    </header>
+                    <h3 class="pass__name">{p.name}</h3>
+                    <p class="pass__coord at-mono">{coord(p.lat, p.lng)} · {p.region}</p>
+                    <p class="pass__note">{p.note}</p>
+                    {p.photo && (
+                      <figure class="pass__photo"><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" /></figure>
+                    )}
+                    {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
+                    <footer class="pass__stub at-mono">
+                      {leg ? (
+                        <>
+                          <span class="pass__leg"><span>From {places[i - 1].name}</span><span aria-hidden="true">→</span></span>
+                          <span>{formatKm(leg.km)}</span>
+                          {p.mode ? <span>{MODE[p.mode]}</span> : leg.overland && <span>Overland</span>}
+                          <span>Trip {pad(leg.trip)}</span>
+                        </>
+                      ) : (
+                        <span>Home · {p.region}</span>
+                      )}
+                    </footer>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          </div>
-        </article>
-      ))}
+          <p class="sr-only" aria-live="polite" data-live></p>
+        </div>
+      </div>
     </section>
 
     <!-- ============ NOTEBOOK ============ -->
@@ -244,21 +306,28 @@ const cities = new Set(concerts.map((c) => c.city)).size;
   /* ---- globe + labels ---- */
   .at-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; transition: opacity 0.8s; }
   .at-globe:not(.is-live) { opacity: 0; }
-  .at-globe.is-away, .at-labels.is-away { opacity: 0; pointer-events: none; }
+  .at-globe.is-away, .lbls.is-away { opacity: 0; pointer-events: none; }
   html:not(.has-cursor) .at-globe { pointer-events: none; }
   html.has-cursor .at-globe { cursor: grab; }
-  .at-labels { position: fixed; inset: 0; z-index: 1; pointer-events: none; transition: opacity 0.8s; }
-  .at-label { position: absolute; top: 0; left: 0; display: grid; gap: 0.5rem; justify-items: start; will-change: transform; transition: opacity 0.4s; }
-  .at-label__name { margin-left: 14px; font: 500 0.625rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; translate: 0 -50%; }
-  .at-label.is-active .at-label__name { color: var(--accent); text-shadow: 0 0 12px rgba(255, 180, 84, 0.6); }
-  /* placeholder stops only name themselves while they're the active stop */
-  .at-label.is-tba:not(.is-active) .at-label__name { visibility: hidden; }
-  .at-label img { margin-left: 18px; width: 9rem; aspect-ratio: 4 / 5; object-fit: cover; border: 4px solid var(--ink); box-shadow: 0 20px 50px rgba(77, 124, 255, 0.35); rotate: -3deg; opacity: 0; transform: translateY(10px) scale(0.9); transition: opacity 0.6s var(--ease), transform 0.8s var(--ease); }
-  .at-label.is-active img { opacity: 1; transform: none; }
-  @media (max-width: 767px) { .at-label img { width: 5.5rem; } }
+  /* stop labels, laid out by src/scripts/atlas/labels.ts */
+  .lbls { position: fixed; inset: 0; z-index: 1; pointer-events: none; transition: opacity 0.8s; }
+  .lbl {
+    position: absolute; top: 0; left: 0; opacity: 0; will-change: transform, opacity; white-space: nowrap;
+    padding: 2px 4px; font: 500 0.6875rem/1.2 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(226, 230, 255, 0.84); text-shadow: 0 0 2px var(--night), 0 0 8px rgba(4, 5, 13, 0.95);
+  }
+  .lbl.is-reached { color: rgba(255, 226, 184, 0.9); }
+  .lbl.is-active { font-size: 0.875rem; letter-spacing: 0.12em; color: var(--accent); text-shadow: 0 0 2px var(--night), 0 0 16px rgba(255, 180, 84, 0.55); }
+  .lbl--cluster {
+    display: flex; gap: 0.55em; align-items: center; padding: 4px 9px 4px 10px; border: 1px solid rgba(200, 208, 255, 0.26); border-radius: 999px;
+    background: rgba(4, 5, 13, 0.78); color: rgba(226, 230, 255, 0.9); text-shadow: none;
+  }
+  .lbl__count { color: var(--accent); }
+  .lbl-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .lbl-lines path { fill: none; stroke: rgba(226, 230, 255, 0.5); stroke-width: 1; }
 
   main { position: relative; z-index: 2; pointer-events: none; }
-  main a, main button, .at-stop__card, .at-notebook, .at-footer { pointer-events: auto; }
+  main a, main button, .pass, .at-notebook, .at-footer { pointer-events: auto; }
 
   /* ---- hero ---- */
   .at-hero { min-height: 100svh; display: grid; align-items: center; padding: 7rem var(--gutter) 4rem; position: relative; }
@@ -293,70 +362,110 @@ const cities = new Set(concerts.map((c) => c.city)).size;
   }
   html.js .at-hero [data-hero-in] { opacity: 0; transform: translateY(16px); }
 
-  /* ---- journey ---- */
-  .at-journey { position: relative; --rail-x: var(--gutter); --rail-gap: 2.25rem; padding-block: 30svh; }
-  /* stops sit close together (5–6 per screen); the height is fixed so the active card grows over its neighbours without moving the page */
-  .at-stop { position: relative; height: clamp(8.5rem, 16svh, 11rem); display: flex; align-items: center; padding: 0 var(--gutter) 0 calc(var(--gutter) + var(--rail-gap)); }
-  .at-stop.is-current { z-index: 1; }
-  .at-stop__inner { position: relative; width: min(26rem, 100%); }
-  .at-stop__card {
-    width: 100%; transform-origin: left center; padding: clamp(1.5rem, 3vw, 2.25rem); border: 1px solid var(--faint); border-radius: 6px;
-    background: color-mix(in srgb, var(--night-2) 70%, transparent); backdrop-filter: blur(14px);
-    box-shadow: inset 0 1px 0 rgba(111, 242, 224, 0.12), 0 30px 60px rgba(0, 0, 0, 0.35);
-  }
-  .at-stop.is-tba .at-stop__card { border-style: dashed; }
+  /* ---- journey ----
+     Default (no JS, reduced motion, no WebGL): a readable list of passes over the globe.
+     .is-deck (rich motion): a tall scroll track under a sticky 100svh stage — rail, card slot,
+     and the globe behind — driven by src/scripts/atlas/ui/journey.ts. */
+  .jr { position: relative; }
+  .jr__track { position: relative; padding: 4rem var(--gutter); }
+  .jr__snap { display: none; }
+  .jr-rail { display: none; }
+  .jr-deck { display: grid; gap: 1.25rem; max-width: 28rem; }
+  .jr-sr a:focus { position: fixed; top: 5rem; left: var(--gutter); z-index: 50; width: auto; height: auto; clip: auto; padding: 0.6rem 1rem; background: var(--night-2); color: var(--accent); }
 
-  /* the rail threads every stop; its fill tracks the activation line (55% of the viewport) */
-  .at-rail {
-    position: absolute; top: 0; bottom: 0; left: var(--rail-x); width: 1px; pointer-events: none;
-    background: rgba(200, 208, 255, 0.22);
-    mask: linear-gradient(transparent, #000 40svh, #000 calc(100% - 40svh), transparent);
+  .pass { position: relative; pointer-events: auto; }
+  .pass__face {
+    position: relative; padding: clamp(1.4rem, 2.4vw, 2rem); border: 1px solid rgba(255, 180, 84, 0.34); border-radius: 12px;
+    background: linear-gradient(160deg, rgba(20, 24, 52, 0.94), rgba(8, 10, 26, 0.94));
+    box-shadow: inset 0 1px 0 rgba(111, 242, 224, 0.1), 0 30px 70px rgba(0, 0, 0, 0.45), 0 0 44px rgba(255, 180, 84, 0.08);
   }
-  .at-rail__fill { position: absolute; inset: 0 -0.5px; background: var(--accent); box-shadow: 0 0 8px rgba(255, 180, 84, 0.7); transform-origin: top; transform: scaleY(0); }
-  .at-stop__node {
-    position: absolute; top: 50%; left: calc(-1 * var(--rail-gap)); width: 9px; height: 9px; translate: -4px -50%; border-radius: 50%;
-    background: var(--night); border: 1px solid var(--muted); transition: background-color 0.5s, border-color 0.5s, box-shadow 0.5s, scale 0.5s var(--ease);
+  .pass.is-tba .pass__face { border-style: dashed; }
+  .pass__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem 1rem; color: var(--accent); }
+  .pass__no { white-space: nowrap; }
+  .pass__no b { font-weight: 500; color: var(--ink); }
+  .pass__when { color: var(--accent); text-align: right; }
+  .pass__name { margin-top: 1.1rem; font: 300 clamp(2.5rem, 4.6vw, 4rem)/0.95 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; }
+  .pass__coord { margin-top: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pass__note { margin-top: 1.1rem; font: italic 400 clamp(1.05rem, 1.5vw, 1.2rem)/1.45 var(--font-display); }
+  .pass__photo { margin-top: 1.1rem; }
+  .pass__photo img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 4px; }
+  .pass__link { display: inline-block; margin-top: 1rem; color: var(--land-n); text-decoration: none; }
+  .pass__stub {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin-top: 1.4rem; padding-top: 1rem; color: var(--muted);
+    border-top: 1px dashed rgba(200, 208, 255, 0.22); font-variant-numeric: tabular-nums;
   }
-  /* a short tick joins the node to its card */
-  .at-stop__node::after { content: ""; position: absolute; top: 50%; left: 100%; width: calc(var(--rail-gap) - 5px); height: 1px; background: var(--faint); transition: background-color 0.5s; }
-  .at-stop.is-past .at-stop__node { background: var(--accent); border-color: var(--accent); }
-  .at-stop.is-current .at-stop__node { background: var(--accent); border-color: var(--accent); scale: 1.5; box-shadow: 0 0 0 5px rgba(255, 180, 84, 0.18), 0 0 16px rgba(255, 180, 84, 0.8); }
-  .at-stop.is-current .at-stop__node::after { background: var(--accent); }
+  .pass__leg { display: inline-flex; gap: 0.6em; color: var(--ink); }
 
-  /* the stop you're on steps forward; the rest recede */
-  html:not(.no-globe) .at-stop__card {
-    transform: scale(0.64); opacity: 0.32; background: transparent; backdrop-filter: blur(0); box-shadow: none; border-color: transparent;
-    transition: transform 0.8s var(--ease), opacity 0.6s var(--ease), background-color 0.6s, backdrop-filter 0.6s, border-color 0.6s, box-shadow 0.8s;
+  /* rich layout */
+  .jr.is-deck .jr__track { height: calc(var(--units, 12) * var(--unit) + 100svh); padding: 0; --unit: 62svh; }
+  .jr.is-deck .jr__snap { display: block; position: absolute; left: 0; width: 1px; height: 1px; scroll-snap-align: center; pointer-events: none; }
+  .jr.is-deck .jr__stage {
+    position: sticky; top: 0; height: 100svh; display: grid; align-items: center;
+    grid-template-columns: 14.5rem minmax(19rem, 25rem) 1fr; column-gap: clamp(1.5rem, 3vw, 3rem);
+    padding: 5.5rem var(--gutter) 2.5rem;
   }
-  html:not(.no-globe) .at-stop:hover .at-stop__card { opacity: 0.6; }
-  html:not(.no-globe) .at-stop.is-current .at-stop__card {
-    transform: scale(1.06); opacity: 1; border-color: rgba(255, 180, 84, 0.45);
-    background: color-mix(in srgb, var(--night-2) 88%, transparent); backdrop-filter: blur(14px);
-    box-shadow: inset 0 1px 0 rgba(111, 242, 224, 0.12), 0 40px 80px rgba(0, 0, 0, 0.45), 0 0 40px rgba(255, 180, 84, 0.12);
+  .jr.is-deck .jr-deck { display: block; position: relative; align-self: stretch; max-width: none; }
+  .jr.is-deck .pass {
+    position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%;
+    opacity: 0; visibility: hidden; transform: translateY(20px);
+    transition: opacity 0.4s, transform 0.55s var(--ease), visibility 0s 0.55s;
   }
-  /* receded stops show only kicker + name; the details open on the current stop */
-  .at-stop__more { display: grid; grid-template-rows: 1fr; }
-  .at-stop__more > div { min-height: 0; overflow: hidden; }
-  html:not(.no-globe) .at-stop__more { grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.8s var(--ease), opacity 0.5s; }
-  html:not(.no-globe) .at-stop.is-current .at-stop__more { grid-template-rows: 1fr; opacity: 1; transition-delay: 0.1s; }
-  html:not(.no-globe) .at-stop:not(.is-current) .at-kicker { margin-bottom: 0.5rem; }
-  .at-stop.is-tba .at-stop__name { opacity: 0.55; }
-  .at-stop__name { font: 300 clamp(2.75rem, 5.5vw, 4.5rem)/0.95 var(--font-display); letter-spacing: -0.03em; }
-  .at-stop__coord { margin-top: 0.75rem; color: var(--muted); }
-  .at-stop__note { margin-top: 1.25rem; font: italic 400 1.25rem/1.4 var(--font-display); }
-  .at-stop__link { display: inline-block; margin-top: 1.25rem; color: var(--land-n); text-decoration: none; }
-  .at-stop__link:hover { color: var(--accent); }
-  .at-stop__photo { display: none; margin-top: 1.25rem; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 2px; }
-  /* no globe (reduced motion / no WebGL) → photos live in the cards instead of on the map */
-  html.no-globe .at-stop__photo { display: block; }
-  html.no-globe .at-stop { height: auto; padding-block: 2rem; }
-  html.no-globe .at-journey { padding-block: 0; }
-  html.no-globe .at-rail__fill { transform: none; }
-  @media (max-width: 767px) {
-    .at-journey { --rail-gap: 1.5rem; }
-    .at-stop { height: clamp(6.5rem, 13svh, 8rem); }
-    .at-stop__inner { width: 100%; }
+  .jr.is-deck .pass[data-dir="back"] { transform: translateY(-20px); }
+  .jr.is-deck .pass.is-leaving { transform: translateY(-20px); }
+  .jr.is-deck .pass.is-leaving[data-dir="back"] { transform: translateY(20px); }
+  .jr.is-deck .pass.is-current { opacity: 1; visibility: visible; transform: none; transition: opacity 0.5s 0.08s, transform 0.7s var(--ease) 0.08s, visibility 0s; }
+
+  /* the rail: a vertical flight path; legs bow out by their arc heights */
+  .jr.is-deck .jr-rail { display: block; position: relative; align-self: center; height: min(72svh, 42rem); pointer-events: auto; }
+  .jr-rail__path { position: absolute; left: 0; top: 0; width: 2.5rem; height: 100%; overflow: visible; }
+  .jr-rail__route { fill: none; stroke: rgba(200, 208, 255, 0.28); stroke-width: 1; }
+  .jr-rail__flown { fill: none; stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.7)); }
+  .jr-rail__stops { position: absolute; inset: 0; }
+  .jr-rail__stops li { position: absolute; left: 0; right: 0; top: var(--at); translate: 0 -50%; }
+  .jr-rail__stop {
+    display: flex; align-items: baseline; gap: 0.6rem; width: 100%; padding: 0.2rem 0 0.2rem 1.875rem; text-align: left;
+    font: 500 0.6875rem/1.2 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(226, 230, 255, 0.66);
+    transition: color 0.3s;
   }
+  .jr-rail__stop:hover, .jr-rail__stop:focus-visible { color: var(--ink); }
+  .jr-rail__stop.is-past { color: rgba(226, 230, 255, 0.8); }
+  .jr-rail__stop.is-current { color: var(--accent); }
+  .jr-rail__node {
+    position: absolute; left: 1.875rem; top: 50%; width: 7px; height: 7px; translate: -50% -50%; border-radius: 50%;
+    background: var(--night); border: 1px solid rgba(226, 230, 255, 0.55); transition: background-color 0.3s, border-color 0.3s, scale 0.4s var(--ease);
+  }
+  .jr-rail__stop.is-past .jr-rail__node { background: var(--accent); border-color: var(--accent); }
+  .jr-rail__stop.is-current .jr-rail__node { background: var(--accent); border-color: var(--accent); scale: 1.5; box-shadow: 0 0 0 4px rgba(255, 180, 84, 0.18), 0 0 12px rgba(255, 180, 84, 0.8); }
+  .jr-rail__name { margin-left: 0.7rem; white-space: nowrap; }
+  .jr-rail__date { color: rgba(226, 230, 255, 0.5); white-space: nowrap; display: none; }
+  .jr-rail__stop.is-current .jr-rail__date { display: inline; color: rgba(255, 180, 84, 0.75); }
+  .jr-rail__plane {
+    position: absolute; left: calc(var(--px, 0.75) * 2.5rem); top: var(--py, 0%); z-index: 1; display: flex; align-items: center; gap: 0.5rem;
+    translate: -8px -8px; color: var(--accent); pointer-events: none;
+  }
+  .jr-rail__plane svg { width: 16px; height: 16px; rotate: calc(var(--rot, 1.5708rad) - 1.5708rad + 180deg); filter: drop-shadow(0 0 6px rgba(255, 180, 84, 0.8)); }
+  .jr-rail__alt { position: absolute; right: calc(100% + 0.4rem); color: rgba(255, 180, 84, 0.8); font-size: 0.5625rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* compact: globe up top, the rail as a strip under the nav, the pass as a bottom sheet */
+  @media (max-width: 899px), (orientation: portrait) and (max-width: 1100px) {
+    .jr.is-deck .jr__track { --unit: 50svh; }
+    .jr.is-deck .jr__stage { display: block; padding: 0; }
+    .jr.is-deck .jr-rail { position: absolute; left: var(--gutter); right: var(--gutter); top: 4.9rem; height: 1.5rem; }
+    .jr.is-deck .jr-rail__path { display: none; }
+    .jr.is-deck .jr-rail__stops::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(200, 208, 255, 0.28); }
+    .jr.is-deck .jr-rail__stops li { left: var(--at); right: auto; top: 50%; translate: -50% -50%; }
+    .jr.is-deck .jr-rail__stop { padding: 0.55rem; width: auto; }
+    .jr.is-deck .jr-rail__node { left: 50%; }
+    .jr.is-deck .jr-rail__name, .jr.is-deck .jr-rail__date { display: none; }
+    .jr.is-deck .jr-rail__plane { display: none; }
+    .jr.is-deck .jr-deck { position: absolute; left: var(--gutter); right: var(--gutter); bottom: max(1rem, env(safe-area-inset-bottom)); height: auto; }
+    .jr.is-deck .pass { top: auto; bottom: 0; translate: none; }
+    .jr.is-deck .pass__name { font-size: clamp(2.1rem, 9vw, 2.9rem); margin-top: 0.8rem; }
+    .jr.is-deck .pass__note { margin-top: 0.8rem; font-size: 1rem; }
+    .jr.is-deck .pass__photo img { aspect-ratio: 16 / 7; }
+    .jr.is-deck .pass__stub { margin-top: 1rem; padding-top: 0.8rem; }
+  }
+  @media (pointer: coarse) { html:has(.jr.is-deck) { scroll-snap-type: y proximity; } }
 
   /* ---- notebook ---- */
   .at-notebook { position: relative; padding: clamp(6rem, 16vh, 10rem) var(--gutter); background: linear-gradient(transparent, var(--night) 12rem); }

@@ -40,14 +40,19 @@ async function newPage(browser, vp, extra = {}) {
   return { ctx, page };
 }
 
-/** Scroll so stop i sits on the activation line; returns once the page has had time to fly there. */
+/** Scroll to stop i (the atlas QA hook knows each stop's dwell; older markup falls back to the
+ *  55% activation line) and give the page time to fly there. */
 async function toStop(page, i, wait = 2400) {
   await page.evaluate((i) => {
-    const el = document.querySelectorAll("[data-stop]")[i];
+    const qa = window.__atlasQA;
+    if (qa?.stopY && !document.querySelector(".jr:not(.is-deck)")) {
+      window.scrollTo({ top: qa.stopY(i), behavior: "instant" });
+      return;
+    }
+    const el = document.querySelectorAll("[data-stop], [data-card]")[i];
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const line = window.__qaActivationLine ?? 0.55;
-    window.scrollTo({ top: window.scrollY + r.top + r.height / 2 - innerHeight * line, behavior: "instant" });
+    window.scrollTo({ top: window.scrollY + r.top + r.height / 2 - innerHeight * 0.55, behavior: "instant" });
   }, i);
   await settle(page, wait);
 }
@@ -73,7 +78,7 @@ async function captureViewport(browser, vp) {
   await settle(page, 3200);
   await shoot(page, dir, "00-hero");
 
-  const count = await page.locator("[data-stop]").count();
+  const count = await page.evaluate(() => document.querySelectorAll("[data-stop], [data-card]").length);
   const want = stopsFlag ? (stopsFlag === "all" ? "all" : stopsFlag.split(",").map(Number)) : vp.stops;
   const stops = want === "all" ? [...Array(count).keys()] : want.filter((i) => i < count);
   for (const i of stops) {

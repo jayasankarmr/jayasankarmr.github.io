@@ -1,7 +1,8 @@
 // Layout audit for the journey, stop by stop:
-//  - label collisions: pairs of visible globe labels ([data-label]) whose boxes intersect
-//  - card overlap: visible text of other stops that intersects the active stop card
-//  - faint text: smallest rendered size + effective contrast of inactive stop text
+//  - label collisions: pairs of visible globe labels / cluster badges whose boxes intersect
+//  - label vs UI: labels overlapping the active pass card, the rail or the nav
+//  - card vs rail: the active card overlapping any rail text
+//  - rail legibility: smallest rendered size and effective contrast of rail text
 // Effective contrast folds ancestor opacity into the text colour over the page background.
 //
 //   node scripts/qa/layout-audit.mjs <outDir> [baseUrl] [width] [height]
@@ -19,17 +20,13 @@ const page = await ctx.newPage();
 await page.goto(base + "/", { waitUntil: "networkidle" });
 await page.waitForFunction(() => document.documentElement.classList.contains("is-loaded"), null, { timeout: 15000 });
 await page.waitForTimeout(3000);
+await page.evaluate(() => { if (window.__atlasQA) window.__atlasQA.noSnap = true; });
 
-const count = await page.locator("[data-stop]").count();
+const count = await page.evaluate(() => window.__atlasQA?.stops ?? document.querySelectorAll("[data-card]").length);
 const rows = [];
-for (let i = 0; i < count; i++) {
-  await page.evaluate((i) => {
-    const el = document.querySelectorAll("[data-stop]")[i];
-    const r = el.getBoundingClientRect();
-    const line = window.__qaActivationLine ?? 0.55;
-    window.scrollTo({ top: scrollY + r.top + r.height / 2 - innerHeight * line, behavior: "instant" });
-  }, i);
-  await page.waitForTimeout(2300);
+for (let i = -1; i < count; i++) {
+  await page.evaluate((i) => window.scrollTo({ top: i < 0 ? 0 : window.__atlasQA.stopY(i), behavior: "instant" }), i);
+  await page.waitForTimeout(i < 0 ? 1500 : 2300);
   rows.push(await page.evaluate((i) => {
     const lum = ([r, g, b]) => {
       const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -38,74 +35,60 @@ for (let i = 0; i < count; i++) {
     const rgba = (s) => (s.match(/[\d.]+/g) || []).map(Number);
     const bg = [4, 5, 13];
     const effOpacity = (el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; };
-    const visible = (el) => {
-      const cs = getComputedStyle(el);
-      if (cs.visibility === "hidden" || cs.display === "none") return false;
-      const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && effOpacity(el) > 0.08;
-    };
-    const hit = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+    const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, r }; };
+    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const shown = (el) => effOpacity(el) > 0.5 && getComputedStyle(el).visibility !== "hidden" && el.getBoundingClientRect().width > 0;
 
-    // 1. globe label collisions
-    const labels = [...document.querySelectorAll("[data-label]")]
-      .map((l) => ({ name: l.textContent.trim().split("\n")[0], el: l.querySelector("[class*=name]") || l }))
-      .filter((l) => visible(l.el));
+    const labels = [...document.querySelectorAll(".lbl")].filter(shown).map((el) => ({ name: el.textContent.trim(), b: box(el) }));
     const collisions = [];
     for (let a = 0; a < labels.length; a++)
       for (let b = a + 1; b < labels.length; b++)
-        if (hit(labels[a].el.getBoundingClientRect(), labels[b].el.getBoundingClientRect())) collisions.push(`${labels[a].name} × ${labels[b].name}`);
+        if (hit(labels[a].b, labels[b].b)) collisions.push(`${labels[a].name} × ${labels[b].name}`);
 
-    // 2. active card vs other stops' visible text
-    const stops = [...document.querySelectorAll("[data-stop]")];
-    const card = stops[i].querySelector("[class*=card]") || stops[i];
-    const cr = card.getBoundingClientRect();
-    const overlaps = [];
-    stops.forEach((s, k) => {
-      if (k === i) return;
-      s.querySelectorAll("h2, h3, p, [class*=name], [class*=kicker]").forEach((t) => {
-        if (visible(t) && hit(cr, t.getBoundingClientRect())) overlaps.push(`${s.dataset.name}`);
-      });
-    });
+    const card = document.querySelector(".pass.is-current");
+    const cardB = card && shown(card) ? box(card) : null;
+    const rail = document.querySelector("[data-rail]");
+    const railText = rail ? [...rail.querySelectorAll(".jr-rail__name, .jr-rail__date")].filter((e) => getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0) : [];
+    const nav = { x: 0, y: 0, w: innerWidth, h: 70 };
+    const labelOverUI = [];
+    for (const l of labels) {
+      if (cardB && hit(l.b, cardB)) labelOverUI.push(`${l.name}→card`);
+      if (hit(l.b, nav)) labelOverUI.push(`${l.name}→nav`);
+      for (const t of railText) if (hit(l.b, box(t))) { labelOverUI.push(`${l.name}→rail`); break; }
+    }
+    const cardOverRail = cardB ? railText.filter((t) => hit(box(t), cardB)).map((t) => t.textContent.trim()) : [];
 
-    // 3. faintest inactive stop text on screen
     let minContrast = 99, minPx = 99;
-    stops.forEach((s, k) => {
-      if (k === i) return;
-      s.querySelectorAll("h2, p").forEach((t) => {
-        if (!visible(t)) return;
-        const r = t.getBoundingClientRect();
-        if (r.bottom < 70 || r.top > innerHeight) return;
-        const cs = getComputedStyle(t);
-        const [cr_, cg, cb, ca = 1] = rgba(cs.color);
-        const o = effOpacity(t) * ca;
-        const eff = [cr_ * o + bg[0] * (1 - o), cg * o + bg[1] * (1 - o), cb * o + bg[2] * (1 - o)];
-        const L1 = lum(eff), L2 = lum(bg);
-        const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
-        // rendered size includes transforms (scale) on ancestors
-        const px = parseFloat(cs.fontSize) * (r.height / (t.offsetHeight || r.height));
-        minContrast = Math.min(minContrast, ratio);
-        minPx = Math.min(minPx, px);
-      });
-    });
+    for (const t of railText) {
+      const cs = getComputedStyle(t.closest("button") ?? t);
+      const [r, g, b, a = 1] = rgba(cs.color);
+      const o = effOpacity(t) * a;
+      const eff = [r * o + bg[0] * (1 - o), g * o + bg[1] * (1 - o), b * o + bg[2] * (1 - o)];
+      const ratio = (Math.max(lum(eff), lum(bg)) + 0.05) / (Math.min(lum(eff), lum(bg)) + 0.05);
+      minContrast = Math.min(minContrast, ratio);
+      minPx = Math.min(minPx, parseFloat(cs.fontSize));
+    }
     return {
       stop: i + 1,
-      name: stops[i].dataset.name,
+      name: i < 0 ? "(hero)" : document.querySelectorAll("[data-card]")[i]?.querySelector(".pass__name")?.textContent,
+      active: window.__atlasQA?.director?.active,
       visibleLabels: labels.length,
       collisions: collisions.length,
-      collisionPairs: collisions.slice(0, 8),
-      cardOverlaps: [...new Set(overlaps)],
-      inactiveMinContrast: minContrast === 99 ? null : +minContrast.toFixed(2),
-      inactiveMinPx: minPx === 99 ? null : +minPx.toFixed(1),
+      collisionPairs: collisions.slice(0, 6),
+      labelOverUI,
+      cardOverRail,
+      railMinContrast: railText.length ? +minContrast.toFixed(2) : null,
+      railMinPx: railText.length ? minPx : null,
     };
   }, i));
 }
 await browser.close();
 
 writeFileSync(join(out, `layout-audit-${w}.json`), JSON.stringify(rows, null, 2));
-let totalCollisions = 0, totalOverlaps = 0;
+let tc = 0, tu = 0, tr = 0, wrongActive = 0;
 for (const r of rows) {
-  totalCollisions += r.collisions;
-  totalOverlaps += r.cardOverlaps.length;
-  console.log(`${String(r.stop).padStart(2)} ${r.name.padEnd(22)} labels ${String(r.visibleLabels).padStart(2)} · collisions ${String(r.collisions).padStart(2)} · card over [${r.cardOverlaps.join(", ")}] · faint text ${r.inactiveMinPx}px @ ${r.inactiveMinContrast}:1`);
+  tc += r.collisions; tu += r.labelOverUI.length; tr += r.cardOverRail.length;
+  if (r.stop > 0 && r.active !== r.stop - 1) wrongActive++;
+  console.log(`${String(r.stop).padStart(2)} ${String(r.name).padEnd(22)} labels ${String(r.visibleLabels).padStart(2)} · collisions ${r.collisions}${r.collisions ? ` [${r.collisionPairs.join(", ")}]` : ""} · label/UI ${r.labelOverUI.length ? r.labelOverUI.join(",") : 0} · card/rail ${r.cardOverRail.length} · rail ${r.railMinPx}px @ ${r.railMinContrast}:1`);
 }
-console.log(`TOTAL @${w}×${h}: ${totalCollisions} label collisions, ${totalOverlaps} card/neighbour overlaps`);
+console.log(`TOTAL @${w}×${h}: ${tc} label collisions, ${tu} label/UI overlaps, ${tr} card/rail overlaps, ${wrongActive} stops with the wrong active card`);
