@@ -204,7 +204,15 @@ export class World {
     markers.name = "markers";
     scene.add(markers);
 
-    await this.stage.renderer.compileAsync(scene, this.stage.camera);
+  }
+
+  /** Compile every program up front (hidden layers included), so no first use stalls a frame. */
+  async compileAll() {
+    const { scene, camera, renderer } = this.stage;
+    const hidden: { visible: boolean }[] = [];
+    scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    await renderer.compileAsync(scene, camera);
+    hidden.forEach((o) => (o.visible = false));
   }
 
   /** Stars stretch along this screen-space velocity (CSS px per frame). */

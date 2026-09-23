@@ -87,6 +87,7 @@ export class Director {
     await this.world.build();
     await this.lod.build(this.stage.scene);
     this.routes.build(this.stage.scene);
+    await this.world.compileAll();
     this.world.syncViewport();
     Object.assign(this.base, this.heroFrame());
     Object.assign(this.heroPose, this.base);

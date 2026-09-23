@@ -7,6 +7,7 @@ import { segmentLayout, dwellCentre, locate, type Layout, type Where } from "../
 import type { Leg } from "../journey";
 import { scroll as S, ease, clamp } from "../motion";
 import { formatCoord, EARTH_KM } from "../geo";
+import { CardDeck } from "./card";
 
 export type StopInfo = { name: string; region: string; lat: number; lng: number; when?: string; recurring?: boolean; home?: boolean };
 type Rect = { x: number; y: number; w: number; h: number };
@@ -28,7 +29,7 @@ export class JourneyUI {
   private railFill: SVGPathElement;
   private plane: HTMLElement;
   private alt: HTMLElement;
-  private cards: HTMLElement[];
+  private deck: CardDeck;
   private live: HTMLElement;
   private snaps: HTMLElement[];
   private trackTop = 0;
@@ -38,13 +39,14 @@ export class JourneyUI {
   private dir = 1;
   private snapping = false;
   private liveTimer = 0;
+  private cards: HTMLElement[];
   private cardRect: Rect | null = null;
   private activeAt = 0;
   private listeners = new Set<(i: number, dir: number) => void>();
   private stopY: number[];
   private railBox = { w: 1, h: 1 };
 
-  constructor(root: HTMLElement, private stops: StopInfo[], private legs: Leg[], private reduced: boolean) {
+  constructor(root: HTMLElement, private stops: StopInfo[], private legs: Leg[], private reduced: boolean, glPhotos = true) {
     this.layout = segmentLayout(legs, stops.length);
     this.heroEl = document.querySelector<HTMLElement>("[data-hero]")!;
     this.track = root.querySelector<HTMLElement>("[data-track]")!;
@@ -53,6 +55,7 @@ export class JourneyUI {
     this.railFill = root.querySelector<SVGPathElement>("[data-rail-fill]")!;
     this.plane = root.querySelector<HTMLElement>("[data-rail-plane]")!;
     this.alt = root.querySelector<HTMLElement>("[data-rail-alt]")!;
+    this.deck = new CardDeck(root, reduced, matchMedia("(hover: hover) and (pointer: fine)").matches, glPhotos);
     this.cards = [...root.querySelectorAll<HTMLElement>("[data-card]")];
     this.live = root.querySelector<HTMLElement>("[data-live]")!;
     this.snaps = [...root.querySelectorAll<HTMLElement>("[data-snap]")];
@@ -105,11 +108,7 @@ export class JourneyUI {
     const prev = this.active;
     this.active = i;
     this.activeAt = performance.now();
-    this.cards.forEach((c, k) => {
-      c.classList.toggle("is-current", k === i);
-      c.classList.toggle("is-leaving", k === prev && !this.seeking);
-      c.dataset.dir = dir > 0 ? "fwd" : "back";
-    });
+    this.deck.show(i, dir, this.seeking);
     this.cardRect = null;
     this.railStops.forEach((b, k) => {
       b.classList.toggle("is-current", k === i);
@@ -136,6 +135,7 @@ export class JourneyUI {
     let k = w.i, t = 0;
     if (!w.dwell && k < this.legs.length) t = comet;
     if (this.heroOut < 1) { k = 0; t = 0; }
+    this.deck.flight(w.i, this.heroOut >= 1 && !w.dwell && w.active === w.i ? comet : null);
     const d = this.pathUpTo(k, t);
     this.railFill.setAttribute("d", d.path);
     this.plane.style.setProperty("--px", (d.x / RAIL_W).toFixed(4));
@@ -192,6 +192,7 @@ export class JourneyUI {
         this.seeking = false;
         const a = this.active;
         this.active = -2; // force the DOM to re-sync on the destination
+        this.deck.show(-2, 1, true);
         this.setActive(a, 1);
       },
     });

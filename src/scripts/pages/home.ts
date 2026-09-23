@@ -61,7 +61,8 @@ async function main() {
 
   const labels = new Labels(labelsRoot, stops);
   const heroCol = document.querySelector<HTMLElement>(".at-hero__col");
-  const ui = new JourneyUI(section, stops, legs, !rich);
+  // the WebGL photo dissolve is a desktop-tier luxury; phones get a composited CSS reveal
+  const ui = new JourneyUI(section, stops, legs, !rich, !tier.mobile && tier.name !== "low");
   (window as unknown as { __atlasQA: unknown }).__atlasQA = { stopY: (i: number) => ui.stopScrollY(i), stops: stops.length, director: globe };
 
   // the stop the page shows: cards + rail (UI), the readout decodes into it

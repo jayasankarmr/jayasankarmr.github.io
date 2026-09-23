@@ -31,6 +31,17 @@ const railPath = legs.reduce((d, l, k) => {
   return d + `Q${(30 - bow * 2).toFixed(2)} ${((railY(k) + railY(k + 1)) / 2).toFixed(1)} 30 ${railY(k + 1).toFixed(1)}`;
 }, "M30 0");
 const MODE = { flight: "By air", train: "By train", road: "By road", bus: "By bus", ferry: "By ferry" } as const;
+// passport guilloche: a few sine-modulated rosettes, drawn once and <use>d by every pass
+const rosette = (R: number, amp: number, k: number, phase: number) => {
+  const pts: string[] = [];
+  for (let s = 0; s <= 96; s++) {
+    const t = (s / 96) * Math.PI * 2;
+    const r = R + amp * Math.sin(k * t + phase);
+    pts.push(`${(120 + r * Math.cos(t)).toFixed(1)} ${(120 + r * Math.sin(t)).toFixed(1)}`);
+  }
+  return `M${pts.join("L")}Z`;
+};
+const guilloche = [[96, 9, 11, 0], [88, 11, 13, 1.1], [78, 8, 9, 0.4], [70, 10, 15, 2.2], [104, 6, 17, 1.7], [60, 7, 7, 0.9]].map(([R, a, k, ph]) => rosette(R, a, k, ph));
 const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat, lng: p.lng, when: p.when && when(p.when), recurring: !!p.recurring, home: !!p.home, leg: !!p.leg }));
 ---
 <Base
@@ -122,23 +133,53 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
             </span>
           </nav>
           <div class="jr-deck" data-deck aria-hidden="true">
+            <svg width="0" height="0" class="jr-defs" aria-hidden="true">
+              <defs>
+                <!-- the stamp's ink bleed: animated from a heavy spread down to a slight wobble -->
+                <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n" />
+                  <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G" data-ink />
+                </filter>
+                <symbol id="guilloche" viewBox="0 0 240 240">
+                  {guilloche.map((d) => <path d={d} />)}
+                </symbol>
+              </defs>
+            </svg>
             {places.map((p, i) => {
               const leg = i > 0 ? legs[i - 1] : null;
+              const stamp = p.home ? "Home" : p.when ? when(p.when) : p.region;
               return (
-                <article class:list={["pass", { "is-home": p.home, "is-tba": p.placeholder, "is-current": i === 0 }]} data-card={i}>
-                  <div class="pass__face">
-                    <header class="pass__head">
-                      <p class="pass__no at-mono">Stop <b>{pad(i + 1)}</b> / {pad(n)}</p>
-                      <p class="pass__when at-mono">{p.home ? "Home" : dated(p) ?? p.region}</p>
-                    </header>
-                    <h3 class="pass__name">{p.name}</h3>
-                    <p class="pass__coord at-mono">{coord(p.lat, p.lng)} · {p.region}</p>
-                    <p class="pass__note">{p.note}</p>
-                    {p.photo && (
-                      <figure class="pass__photo"><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" /></figure>
-                    )}
-                    {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
+                <article class:list={["pass", { "is-home": p.home, "is-tba": p.placeholder, "is-current": i === 0, "has-photo": !!p.photo }]} data-card={i}>
+                  <div class="pass__face" data-face>
+                    <div class="pass__body">
+                      <svg class="pass__guilloche" aria-hidden="true"><use href="#guilloche" /></svg>
+                      <header class="pass__head">
+                        <p class="pass__no at-mono">Stop <b>{pad(i + 1)}</b> / {pad(n)}</p>
+                        <p class="pass__when at-mono">{p.home ? "Home" : dated(p) ?? p.region}</p>
+                      </header>
+                      <h3 class="pass__name" data-name>{p.name}</h3>
+                      <p class="pass__coord at-mono" data-coord>{coord(p.lat, p.lng)} · {p.region}</p>
+                      <p class="pass__note" data-note>{p.note}</p>
+                      {p.photo && (
+                        <figure class="pass__photo" data-photo>
+                          <img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" />
+                        </figure>
+                      )}
+                      {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
+                    </div>
+
+                    <svg class="pass__stamp" viewBox="0 0 120 120" data-stamp aria-hidden="true">
+                      <defs><path id={`ring-${i}`} d="M60 60m-43 0a43 43 0 1 1 86 0a43 43 0 1 1-86 0" /></defs>
+                      <g filter="url(#ink)">
+                        <circle cx="60" cy="60" r="56" class="pass__stamp-rim" />
+                        <circle cx="60" cy="60" r="34" class="pass__stamp-inner" />
+                        <text class="pass__stamp-ring"><textPath href={`#ring-${i}`} textLength="266" lengthAdjust="spacing">{`Stop ${pad(i + 1)} of ${pad(n)} · ${p.region} · An atlas of one ·`}</textPath></text>
+                        <text x="60" y="61" class="pass__stamp-no">{pad(i + 1)}</text>
+                        <text x="60" y="78" class="pass__stamp-date">{stamp}</text>
+                      </g>
+                    </svg>
                     <footer class="pass__stub at-mono">
+                      <span class="pass__flight" aria-hidden="true"><span class="pass__flight-fill"></span><svg viewBox="0 0 16 16"><path d="M8 1.5 9.6 7l4.9 2.4v1.4L9.6 9.4 9.2 12.6l1.6 1.2V15L8 14.2 5.2 15v-1.2l1.6-1.2-.4-3.2-4.9 1.4V9.4L6.4 7Z" fill="currentColor" /></svg></span>
                       {leg ? (
                         <>
                           <span class="pass__leg"><span>From {places[i - 1].name}</span><span aria-hidden="true">→</span></span>
@@ -150,6 +191,7 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
                         <span>Home · {p.region}</span>
                       )}
                     </footer>
+                    <span class="pass__sheen" aria-hidden="true"></span>
                   </div>
                 </article>
               );
@@ -374,27 +416,63 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .jr-sr a:focus { position: fixed; top: 5rem; left: var(--gutter); z-index: 50; width: auto; height: auto; clip: auto; padding: 0.6rem 1rem; background: var(--night-2); color: var(--accent); }
 
   .pass { position: relative; pointer-events: auto; }
-  .pass__face {
-    position: relative; padding: clamp(1.4rem, 2.4vw, 2rem); border: 1px solid rgba(255, 180, 84, 0.34); border-radius: 12px;
-    background: linear-gradient(160deg, rgba(20, 24, 52, 0.94), rgba(8, 10, 26, 0.94));
-    box-shadow: inset 0 1px 0 rgba(111, 242, 224, 0.1), 0 30px 70px rgba(0, 0, 0, 0.45), 0 0 44px rgba(255, 180, 84, 0.08);
+  /* a passport page crossed with a boarding pass: guilloche body, ink stamp, a perforated stub */
+  .pass__face { position: relative; border-radius: 14px; filter: drop-shadow(0 28px 50px rgba(0, 0, 0, 0.5)); --mx: 70%; --my: 20%; }
+  .pass__body {
+    position: relative; overflow: hidden; padding: clamp(1.4rem, 2.4vw, 1.9rem) clamp(1.4rem, 2.4vw, 1.9rem) 1.25rem;
+    border: 1px solid rgba(255, 180, 84, 0.3); border-bottom: 0; border-radius: 14px 14px 0 0;
+    background: linear-gradient(165deg, #161b3d 0%, #0d1129 58%, #0a0d22 100%);
+    /* the perforation's two punched notches */
+    mask: radial-gradient(circle at 0 100%, #0000 9px, #000 9.5px) left / 51% 100% no-repeat,
+          radial-gradient(circle at 100% 100%, #0000 9px, #000 9.5px) right / 51% 100% no-repeat;
   }
-  .pass.is-tba .pass__face { border-style: dashed; }
-  .pass__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem 1rem; color: var(--accent); }
+  .pass__guilloche { position: absolute; right: -5.5rem; top: -4rem; width: 17rem; height: 17rem; fill: none; stroke: rgba(255, 180, 84, 0.075); stroke-width: 0.7; pointer-events: none; }
+  .pass.is-home .pass__guilloche { stroke: rgba(111, 242, 224, 0.08); }
+  .pass__head { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding-right: 5.6rem; color: var(--accent); }
   .pass__no { white-space: nowrap; }
   .pass__no b { font-weight: 500; color: var(--ink); }
-  .pass__when { color: var(--accent); text-align: right; }
-  .pass__name { margin-top: 1.1rem; font: 300 clamp(2.5rem, 4.6vw, 4rem)/0.95 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; }
-  .pass__coord { margin-top: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .pass__note { margin-top: 1.1rem; font: italic 400 clamp(1.05rem, 1.5vw, 1.2rem)/1.45 var(--font-display); }
-  .pass__photo { margin-top: 1.1rem; }
-  .pass__photo img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 4px; }
-  .pass__link { display: inline-block; margin-top: 1rem; color: var(--land-n); text-decoration: none; }
-  .pass__stub {
-    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin-top: 1.4rem; padding-top: 1rem; color: var(--muted);
-    border-top: 1px dashed rgba(200, 208, 255, 0.22); font-variant-numeric: tabular-nums;
+  .pass__when { color: rgba(255, 180, 84, 0.85); }
+  .pass__name { position: relative; margin-top: 1rem; font: 300 clamp(2.5rem, 4.4vw, 3.9rem)/0.95 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; font-variation-settings: "opsz" 144; }
+  .pass__coord { position: relative; margin-top: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pass__note { position: relative; margin-top: 1rem; font: italic 400 clamp(1.05rem, 1.5vw, 1.2rem)/1.45 var(--font-display); }
+  .pass__photo { position: relative; margin-top: 1.1rem; border-radius: 4px; overflow: hidden; }
+  .pass__photo img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+  .pass__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pass__link { position: relative; display: inline-block; margin-top: 1rem; color: var(--land-n); text-decoration: none; }
+  .pass__stamp {
+    position: absolute; top: -0.9rem; right: -0.7rem; z-index: 2; width: 6.4rem; height: 6.4rem; rotate: -9deg;
+    color: rgba(255, 180, 84, 0.88); mix-blend-mode: screen; pointer-events: none; overflow: visible;
   }
+  .pass.is-home .pass__stamp { color: rgba(111, 242, 224, 0.85); }
+  .pass__stamp-rim { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-dasharray: 1 0; }
+  .pass__stamp-inner { fill: none; stroke: currentColor; stroke-width: 0.9; }
+  .pass__stamp text { fill: currentColor; font-family: var(--font-mono); text-anchor: middle; }
+  .pass__stamp-ring { font-size: 7.6px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .pass__stamp-no { font-size: 26px; font-weight: 500; letter-spacing: 0.02em; }
+  .pass__stamp-date { font-size: 7.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .pass__stub {
+    position: relative; display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; padding: 1rem clamp(1.4rem, 2.4vw, 1.9rem) 1.1rem;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(255, 180, 84, 0.3); border-top: 0; border-radius: 0 0 14px 14px;
+    background: linear-gradient(180deg, #0c1027, #0a0d22);
+    mask: radial-gradient(circle at 0 0, #0000 9px, #000 9.5px) left / 51% 100% no-repeat,
+          radial-gradient(circle at 100% 0, #0000 9px, #000 9.5px) right / 51% 100% no-repeat;
+  }
+  /* the perforation, and the flight filling it in */
+  .pass__stub::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; border-top: 1px dashed rgba(255, 180, 84, 0.34); }
+  /* (kept inside the stub: its notch mask clips anything above its top edge) */
+  .pass__flight { position: absolute; left: 14px; right: 14px; top: 0; height: 1px; opacity: 0; transition: opacity 0.3s; }
+  .pass__flight-fill { position: absolute; left: 0; top: 0; height: 1.5px; width: calc(var(--flight, 0) * 100%); background: var(--accent); box-shadow: 0 0 8px rgba(255, 180, 84, 0.8); }
+  .pass__flight svg { position: absolute; top: 2px; left: calc(var(--flight, 0) * 100% - 6px); width: 12px; height: 12px; color: var(--accent); rotate: 90deg; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.8)); }
+  .pass.is-flying .pass__flight { opacity: 1; }
   .pass__leg { display: inline-flex; gap: 0.6em; color: var(--ink); }
+  .pass__sheen {
+    position: absolute; inset: 0; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+    background: radial-gradient(28rem circle at var(--mx) var(--my), rgba(255, 238, 205, 0.1), transparent 55%);
+    mix-blend-mode: screen;
+  }
+  html.has-cursor .pass.is-current .pass__face:hover .pass__sheen { opacity: 1; }
+  .pass.is-tba .pass__body, .pass.is-tba .pass__stub { border-style: dashed; }
 
   /* rich layout */
   .jr.is-deck .jr__track { height: calc(var(--units, 12) * var(--unit) + 100svh); padding: 0; --unit: 62svh; }
@@ -405,15 +483,9 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     padding: 5.5rem var(--gutter) 2.5rem;
   }
   .jr.is-deck .jr-deck { display: block; position: relative; align-self: stretch; max-width: none; }
-  .jr.is-deck .pass {
-    position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%;
-    opacity: 0; visibility: hidden; transform: translateY(20px);
-    transition: opacity 0.4s, transform 0.55s var(--ease), visibility 0s 0.55s;
-  }
-  .jr.is-deck .pass[data-dir="back"] { transform: translateY(-20px); }
-  .jr.is-deck .pass.is-leaving { transform: translateY(-20px); }
-  .jr.is-deck .pass.is-leaving[data-dir="back"] { transform: translateY(20px); }
-  .jr.is-deck .pass.is-current { opacity: 1; visibility: visible; transform: none; transition: opacity 0.5s 0.08s, transform 0.7s var(--ease) 0.08s, visibility 0s; }
+  .jr.is-deck .jr-deck { perspective: 1600px; }
+  .jr.is-deck .pass { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; visibility: hidden; opacity: 0; }
+  .jr.is-deck .pass.is-current { visibility: visible; opacity: 1; }
 
   /* the rail: a vertical flight path; legs bow out by their arc heights */
   .jr.is-deck .jr-rail { display: block; position: relative; align-self: center; height: min(72svh, 42rem); pointer-events: auto; }
@@ -463,7 +535,9 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     .jr.is-deck .pass__name { font-size: clamp(2.1rem, 9vw, 2.9rem); margin-top: 0.8rem; }
     .jr.is-deck .pass__note { margin-top: 0.8rem; font-size: 1rem; }
     .jr.is-deck .pass__photo img { aspect-ratio: 16 / 7; }
-    .jr.is-deck .pass__stub { margin-top: 1rem; padding-top: 0.8rem; }
+    .jr.is-deck .pass__stub { padding-top: 0.8rem; padding-bottom: 0.9rem; }
+    .jr.is-deck .pass__stamp { width: 5rem; height: 5rem; top: -0.7rem; right: -0.4rem; }
+    .jr.is-deck .pass__head { padding-right: 4.4rem; }
   }
   @media (pointer: coarse) { html:has(.jr.is-deck) { scroll-snap-type: y proximity; } }
 
