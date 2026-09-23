@@ -22,8 +22,18 @@ function visualTarget(el: HTMLElement) {
   return { vis, final: el.dataset.final ?? "" };
 }
 
-export function scramble(el: HTMLElement, duration = 900) {
-  const { vis, final } = visualTarget(el);
+/** Resolves el's text out of random glyphs; pass `text` to decode into new text. */
+export function scramble(el: HTMLElement, duration = 900, text?: string) {
+  const target = visualTarget(el);
+  const { vis } = target;
+  let { final } = target;
+  if (text !== undefined && text !== final) {
+    final = text;
+    el.dataset.final = text;
+    const sr = el.querySelector<HTMLElement>(":scope > .sr-only");
+    if (sr) sr.textContent = text;
+  }
+  const run = (el.dataset.run = String(+(el.dataset.run ?? 0) + 1));
   const start = performance.now();
   const frame = () => {
     const p = Math.min(1, (performance.now() - start) / duration);
@@ -31,7 +41,8 @@ export function scramble(el: HTMLElement, duration = 900) {
     let out = final.slice(0, settled);
     for (let i = settled; i < final.length; i++) out += final[i] === " " ? " " : GLYPHS[(Math.random() * GLYPHS.length) | 0];
     vis.textContent = out;
-    if (p < 1) requestAnimationFrame(frame);
+    // a newer scramble on the same element takes over
+    if (p < 1 && el.dataset.run === run) requestAnimationFrame(frame);
   };
   frame();
 }

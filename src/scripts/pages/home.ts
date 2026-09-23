@@ -1,36 +1,34 @@
-// Home: page choreography around the fixed globe.
-import { initSmooth, gsap, ScrollTrigger } from "../motion/smooth";
+// Home: page choreography around the fixed atlas globe.
+import { initSmooth, gsap, ScrollTrigger, lenis } from "../motion/smooth";
 import { initCursor } from "../motion/cursor";
 import { initReveals } from "../motion/reveal";
 import { runLoader } from "../motion/loader";
 import { split } from "../motion/split";
-import { richMotion, reducedMotion, isNarrow } from "../motion/env";
-
-const coord = (lat: number, lng: number) =>
-  `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? "E" : "W"}`;
+import { reducedMotion } from "../motion/env";
+import { registerMotion } from "../atlas/motion";
+import { detectTier } from "../atlas/tier";
+import { readout } from "../atlas/ui/readout";
+import type { Director } from "../atlas/scene";
 
 async function main() {
+  registerMotion();
   initSmooth();
   initCursor();
 
   const canvas = document.querySelector<HTMLCanvasElement>("[data-globe]")!;
   const labelsRoot = document.querySelector<HTMLElement>("[data-labels]")!;
   const stops = [...document.querySelectorAll<HTMLElement>("[data-stop]")];
-  const places = stops.map((s) => ({ lat: +s.dataset.lat!, lng: +s.dataset.lng!, name: s.dataset.name!, leg: "leg" in s.dataset }));
-  const pos = document.querySelector<HTMLElement>("[data-pos]")!;
-  const css = getComputedStyle(document.body);
+  const places = stops.map((s) => ({
+    lat: +s.dataset.lat!, lng: +s.dataset.lng!, name: s.dataset.name!,
+    leg: "leg" in s.dataset, recurring: "recurring" in s.dataset, home: "home" in s.dataset,
+  }));
+  const pos = readout(document.querySelector<HTMLElement>("[data-pos]")!, reducedMotion());
 
-  const globeP = richMotion()
-    ? import("../gl/globe")
-        .then((m) => m.initGlobe(canvas, places, {
-          land: css.getPropertyValue("--land-n").trim(),
-          land2: css.getPropertyValue("--land-s").trim(),
-          accent: css.getPropertyValue("--accent").trim(),
-          atmo: css.getPropertyValue("--atmo").trim(),
-          stars: "#b9c2ff",
-          base: "#070a1c",
-          glow: 1.35,
-        }))
+  const tier = detectTier();
+  document.documentElement.dataset.tier = tier.name;
+  const globeP: Promise<Director | null> = tier.name !== "none"
+    ? import("../atlas/scene")
+        .then((m) => m.createAtlas(canvas, places, tier))
         .catch((e) => { console.warn(e); return null; })
     : Promise.resolve(null);
 
@@ -48,23 +46,20 @@ async function main() {
     document.documentElement.classList.add("no-globe");
     canvas.remove();
     labelsRoot.remove();
+    document.querySelector("[data-globe-ctl]")?.remove();
     initReveals();
     return;
   }
 
-  // layout: globe sits right of the text on desktop, above it on phones
-  const place = (phase: "hero" | "journey") => {
-    if (isNarrow()) globe.layout(0, phase === "hero" ? 1.05 : 0.85);
-    else globe.layout(phase === "hero" ? 0.95 : 0.5, 0);
-  };
-  isNarrow() ? globe.setLayoutNow(0, 1.05) : globe.setLayoutNow(0.95, 0);
   // opacity is left to the CSS transition (.at-globe:not(.is-live)); tweening it here too fights that transition
-  gsap.fromTo(canvas, { scale: 0.92 }, { scale: 1, duration: 2, ease: "expo.out" });
+  if (!reducedMotion()) gsap.fromTo(canvas, { scale: 0.94 }, { scale: 1, duration: 2, ease: "expo.out" });
+  lenis?.on("scroll", () => globe.setScrollVelocity(lenis?.velocity ?? 0));
+  initGlobeControl(globe);
 
   // labels follow their markers every frame
   const labels = [...labelsRoot.querySelectorAll<HTMLElement>("[data-label]")];
-  globe.onFrame((pts) => {
-    pts.forEach((p, i) => {
+  globe.onFrame((d) => {
+    d.projected.forEach((p, i) => {
       labels[i].style.transform = `translate(${p.x}px, ${p.y}px)`;
       labels[i].style.opacity = String(Math.max(0, Math.min(1, (p.facing - 0.1) * 4)));
     });
@@ -74,15 +69,16 @@ async function main() {
   const activate = (i: number) => {
     if (i === current) return;
     current = i;
-    globe.focus(i);
-    place(i < 0 ? "hero" : "journey");
+    if (i < 0) globe.hero();
+    else globe.focus(i);
+    globe.setStops(i, i);
     labels.forEach((l, k) => l.classList.toggle("is-active", k === i));
     stops.forEach((s, k) => {
       s.classList.toggle("is-current", k === i);
       s.classList.toggle("is-past", k < i);
     });
     const p = places[Math.max(0, i)];
-    pos.textContent = `${coord(p.lat, p.lng)} · ${p.name}`;
+    pos.set(p.lat, p.lng, p.name);
   };
   activate(-1);
 
@@ -110,7 +106,7 @@ async function main() {
   });
 
   // globe steps back once the notebook takes over. The trigger runs to the end of the page, so
-  // a jump (anchor, End key, fast flick) can't skip past it; once faded, the loop stops drawing.
+  // a jump (anchor, End key, fast flick) can't skip past it; once faded, the scene stops drawing.
   // (progress, not isActive: at the very bottom a trigger ending at "max" counts as left)
   let away = false, awayTimer = 0;
   const setAway = (v: boolean) => {
@@ -119,8 +115,8 @@ async function main() {
     canvas.classList.toggle("is-away", v);
     labelsRoot.classList.toggle("is-away", v);
     clearTimeout(awayTimer);
-    if (v) awayTimer = window.setTimeout(() => globe.setPaused(true), 850); // after the 0.8s fade
-    else globe.setPaused(false);
+    if (v) awayTimer = window.setTimeout(() => globe.setOffstage(true), 850); // after the 0.8s fade
+    else globe.setOffstage(false);
   };
   ScrollTrigger.create({
     trigger: "#notebook", start: "top 45%", end: "max",
@@ -129,6 +125,28 @@ async function main() {
   });
 
   initReveals();
+}
+
+/** The hero's focusable globe: arrow keys turn it, Home recentres; the ring hugs the globe. */
+function initGlobeControl(globe: Director) {
+  const ctl = document.querySelector<HTMLElement>("[data-globe-ctl]");
+  if (!ctl) return;
+  const place = () => {
+    const f = globe.heroFrame();
+    const { width: w, height: h } = globe.stage;
+    const r = (h / 2) * (Math.tan(Math.asin(1 / (1 + f.dist))) / Math.tan((15 * Math.PI) / 180));
+    ctl.style.setProperty("--x", `${w / 2 + (f.sx * w) / 2}px`);
+    ctl.style.setProperty("--y", `${h / 2 - (f.sy * h) / 2}px`);
+    ctl.style.setProperty("--r", `${r}px`);
+  };
+  place();
+  globe.stage.whenResized(place);
+  const step = 6;
+  ctl.addEventListener("keydown", (e) => {
+    const k = { ArrowLeft: [0, -step], ArrowRight: [0, step], ArrowUp: [step, 0], ArrowDown: [-step, 0] }[e.key];
+    if (k) { e.preventDefault(); globe.nudge(k[0], k[1]); }
+    else if (e.key === "Home") { e.preventDefault(); globe.recentre(); }
+  });
 }
 
 main();
