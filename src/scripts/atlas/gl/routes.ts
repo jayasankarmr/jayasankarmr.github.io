@@ -106,4 +106,8 @@ export class Routes {
   setAlpha(a: number) {
     this.alpha.value = a;
   }
+
+  get alphaValue() {
+    return this.alpha.value;
+  }
 }

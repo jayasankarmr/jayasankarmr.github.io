@@ -61,7 +61,12 @@ export const springs = {
   return: { k: 120, c: 22 },
   label: { k: 260, c: 32 },
   tilt: { k: 140, c: 18 },
+  /** display type's scroll skew: critically damped, settles in about half a second */
+  skew: { k: 150, c: 24 },
 } as const;
+
+/** Scroll feel: display type leans with Lenis velocity (px per frame), capped in degrees. */
+export const feel = { skewPerPx: 0.07, skewMax: 2.5 } as const;
 
 // ---- cubic-bezier → easing function (Newton–Raphson with bisection fallback)
 export function bezier([x1, y1, x2, y2]: Bezier): (t: number) => number {

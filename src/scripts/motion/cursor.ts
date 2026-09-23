@@ -1,10 +1,13 @@
 // Custom cursor: a dot that tracks exactly and a ring that trails.
 // [data-cursor="label"] grows the ring and shows the label; [data-magnetic] pulls toward the pointer.
+// Returns the cursor's parts (null where there is no custom cursor), so a page can add states.
 import { gsap } from "./smooth";
 import { finePointer, reducedMotion } from "./env";
 
-export function initCursor() {
-  if (!finePointer() || reducedMotion()) return;
+export type CursorParts = { root: HTMLElement; ring: HTMLElement; dot: HTMLElement; label: HTMLElement };
+
+export function initCursor(): CursorParts | null {
+  if (!finePointer() || reducedMotion()) return null;
   const root = document.createElement("div");
   root.className = "cursor";
   root.setAttribute("aria-hidden", "true");
@@ -21,9 +24,12 @@ export function initCursor() {
   const dy = gsap.quickTo(dot, "y", { duration: 0.08, ease: "power3" });
 
   window.addEventListener("pointermove", (e) => {
+    // a touch or pen on a hybrid laptop: no cursor to follow
+    if (e.pointerType !== "mouse") { root.classList.remove("is-active"); return; }
     rx(e.clientX); ry(e.clientY); dx(e.clientX); dy(e.clientY);
     root.classList.add("is-active");
   }, { passive: true });
+  window.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") root.classList.remove("is-active"); }, { passive: true });
   document.addEventListener("pointerleave", () => root.classList.remove("is-active"));
 
   document.addEventListener("pointerover", (e) => {
@@ -45,4 +51,5 @@ export function initCursor() {
     });
     el.addEventListener("pointerleave", () => { mx(0); my(0); });
   });
+  return { root, ring, dot, label };
 }

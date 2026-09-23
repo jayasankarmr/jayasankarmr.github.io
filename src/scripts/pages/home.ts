@@ -4,7 +4,7 @@
 import { initSmooth, gsap, ScrollTrigger, lenis } from "../motion/smooth";
 import { initCursor } from "../motion/cursor";
 import { initReveals } from "../motion/reveal";
-import { reducedMotion } from "../motion/env";
+import { reducedMotion, finePointer } from "../motion/env";
 import { registerMotion, ramp, smooth } from "../atlas/motion";
 import { detectTier } from "../atlas/tier";
 import { buildLegs } from "../atlas/journey";
@@ -13,6 +13,11 @@ import { JourneyUI, type StopInfo } from "../atlas/ui/journey";
 import { Labels } from "../atlas/labels";
 import { initLogbook } from "../atlas/ui/logbook";
 import { initTickets } from "../atlas/ui/tickets";
+import { atlasCursor } from "../atlas/ui/cursor";
+import { navRoute } from "../atlas/ui/navroute";
+import { initSkew } from "../atlas/ui/skew";
+import { film } from "../atlas/ui/film";
+import { footerArc } from "../atlas/ui/footer";
 import { clamp } from "../atlas/motion";
 import type { Director } from "../atlas/scene";
 
@@ -44,7 +49,7 @@ function skippable(onSkip: () => void) {
 async function main() {
   registerMotion(gsap);
   initSmooth();
-  initCursor();
+  const cursor = atlasCursor(initCursor());
   document.documentElement.classList.add("is-loaded");
   const kind = introKind();
   let globeRef: Director | null = null;
@@ -57,6 +62,16 @@ async function main() {
   const legs = buildLegs(stops);
   const pos = readout(document.querySelector<HTMLElement>("[data-pos]")!, reducedMotion());
   const rich = !reducedMotion();
+  const route = navRoute(stops.length);
+  // no flight to follow (list layout, or no WebGL): the micro-route tracks the list of passes,
+  // by scroll progress so a jump past the journey still completes it
+  const routeByList = () => ScrollTrigger.create({
+    trigger: section, start: "top 50%", end: "bottom 50%",
+    onUpdate: (st) => route.set(st.progress * (stops.length - 1)),
+    onRefresh: (st) => route.set(st.progress * (stops.length - 1)),
+  });
+  // display type leans with the scroll (desktop: phones scroll natively, and it would only cost them)
+  if (rich && finePointer()) initSkew([...document.querySelectorAll<HTMLElement>(".at-hero__title, .lb__title, .at-live__title, .at-footer__cta")]);
 
   const tier = detectTier();
   document.documentElement.dataset.tier = tier.name;
@@ -77,7 +92,9 @@ async function main() {
     labelsRoot.remove();
     document.querySelector("[data-globe-ctl]")?.remove();
     initTickets(document.querySelector<HTMLElement>("#live")!, { reduced: !rich, fine: matchMedia("(hover: hover) and (pointer: fine)").matches });
+    routeByList();
     initReveals();
+    footerArc(document.querySelector<HTMLElement>("#contact")!, stops[stops.length - 1].name, !rich);
     return;
   }
 
@@ -90,6 +107,8 @@ async function main() {
   else pin?.parentElement?.remove();
   lenis?.on("scroll", () => globe.setScrollVelocity(lenis?.velocity ?? 0));
   initGlobeControl(globe);
+  cursor.attach(globe);
+  film(canvas, !tier.mobile && tier.name !== "low");
 
   const labels = new Labels(labelsRoot, stops);
   const heroCol = document.querySelector<HTMLElement>(".at-hero__col");
@@ -139,6 +158,7 @@ async function main() {
     safeArea();
     addEventListener("resize", safeArea);
   } else {
+    routeByList();
     // list layout: every pass is on the page, so its photo can lazy-load natively
     section.querySelectorAll<HTMLImageElement>("img[data-src]").forEach((img) => { img.loading = "lazy"; img.src = img.dataset.src!; });
     // each pass cuts the globe to its stop as it reaches the middle of the screen
@@ -184,6 +204,8 @@ async function main() {
     };
     labels.update(d.projected, dt, w, h);
     if (!rich) return;
+    // the nav's micro-route: stops reached, plus the leg in flight; complete once the world unrolls
+    route.set(d.mode === "unroll" || d.mode === "map" ? stops.length - 1 : d.flying >= 0 ? d.flying + d.comet : Math.max(0, d.active));
     const s = ui.read(scrollY);
     ui.frame(d.altitude, d.comet);
     ui.settle(s.inJourney);
@@ -228,6 +250,7 @@ async function main() {
     highlight: (i) => globe.setHighlight(i),
   });
   initReveals();
+  footerArc(document.querySelector<HTMLElement>("#contact")!, stops[stops.length - 1].name, !rich);
 }
 
 /** The hero's focusable globe: arrow keys turn it, Home recentres; the ring hugs the globe. */

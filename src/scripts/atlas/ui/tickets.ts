@@ -15,8 +15,9 @@ export function initTickets(section: HTMLElement, o: Opts) {
   const tickets = [...grid.querySelectorAll<HTMLButtonElement>("[data-ticket]")];
 
   // accent: amber → pink as the section arrives, pink → amber as the footer takes over. Set only
-  // on the elements whose CSS re-declares the accent (the nav, this section's head, the footer)
-  const scoped = [document.querySelector(".site-nav"), section.querySelector(".tk__head"), document.getElementById("contact")]
+  // on the elements whose CSS re-declares the accent (the nav, this section's head, the footer,
+  // the cursor)
+  const scoped = [document.querySelector(".site-nav"), section.querySelector(".tk__head"), document.getElementById("contact"), document.querySelector(".cursor")]
     .filter((el): el is HTMLElement => !!el);
   let live = 0, foot = 0, last = "";
   const apply = () => {

@@ -234,6 +234,11 @@ export class World {
     this.body.visible = a > 0.001;
   }
 
+  /** The planet's body (the bloom pass borrows its shape as a depth-only occluder). */
+  get bodyMesh() {
+    return this.body;
+  }
+
   syncViewport() {
     this.u.uPixelRatio.value = this.stage.pixelRatio;
     this.u.uViewport.value.set(this.stage.width * this.stage.pixelRatio, this.stage.height * this.stage.pixelRatio);

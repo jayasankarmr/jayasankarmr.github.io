@@ -37,7 +37,9 @@ html.lenis, html.lenis body { height: auto; }
 
 /* split-text spans (scripts/motion/split.ts) */
 .split-word { display: inline-block; white-space: nowrap; }
-.split-mask { display: inline-block; overflow: clip; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+/* the mask only has to hide what is still below it; padding (cancelled by margins, so layout is
+   unchanged) leaves room for italic overhang and tall ascenders on the other three sides */
+.split-mask { display: inline-block; overflow: clip; vertical-align: top; padding: 0.14em 0.14em 0.08em; margin: -0.14em -0.14em -0.08em; }
 .split-char, .split-inner { display: inline-block; will-change: transform; }
 
 /* no-JS / reduced-motion: anything waiting on a reveal is simply visible */

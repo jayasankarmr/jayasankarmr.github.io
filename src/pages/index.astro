@@ -346,7 +346,7 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     <!-- ============ FOOTER ============ -->
     <footer class="at-footer" id="contact">
       <p class="at-mono at-kicker">Next stop</p>
-      <a class="at-footer__cta" href={`mailto:${site.email}`} data-reveal="split" data-cursor="Write">Where <em>next?</em></a>
+      <a class="at-footer__cta" href={`mailto:${site.email}`} data-reveal="chars" data-cursor="Write">Where <em>next?</em></a>
       <SiteFooter current="home" />
     </footer>
   </main>
@@ -398,10 +398,12 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   /* The blend only reaches what is on screen with the tickets: the nav, the section head and
      the footer. Re-declaring the chain on those three keeps each scrubbed frame's style work to
      their subtrees; a variable changed on body would restyle the whole document every frame. */
-  .at .site-nav, .at .tk__head, .at .at-footer {
+  .at .site-nav, .at .tk__head, .at .at-footer, .at .cursor {
     --accent: color-mix(in oklab, var(--pink) calc(var(--accent-mix) * 100%), var(--amber));
     --chrome-accent: var(--accent);
     --focus: var(--accent);
+    --cursor-ink: var(--accent);
+    --cursor-fill: var(--accent);
   }
   .at ::selection { background: var(--accent); color: var(--night); }
   .at em { font-style: italic; }
@@ -488,7 +490,43 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .at-globe:not(.is-live) { opacity: 0; }
   .at-globe.is-away, .lbls.is-away { opacity: 0; pointer-events: none; }
   html:not(.has-cursor) .at-globe { pointer-events: none; }
-  html.has-cursor .at-globe { cursor: grab; }
+  /* the context cursor draws its own turning glyph over the planet */
+  html.has-cursor .at-globe, html.has-cursor.is-dragging-globe, html.has-cursor.is-dragging-globe .at-globe { cursor: none; }
+  /* film: vignette + grain over the scene, under the page (src/scripts/atlas/ui/film.ts) */
+  .at-film {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s;
+    background: radial-gradient(125% 95% at 50% 48%, transparent 58%, rgba(2, 3, 9, 0.55) 100%);
+  }
+  .at-film.is-on { opacity: 1; }
+  .at-film.has-grain::after { content: ""; position: absolute; inset: 0; opacity: 0.08; mix-blend-mode: soft-light; background: var(--grain, none) 0 0 / 128px 128px; }
+
+  /* ---- the context cursor (src/scripts/atlas/ui/cursor.ts): small tags beside the pointer instead
+     of the shared filled disc; on the planet, a turning glyph and a crosshair with live lat/long */
+  .cursor__glyph, .cursor__cross { position: absolute; fill: none; stroke: currentColor; opacity: 0; transition: opacity 0.25s; overflow: visible; }
+  .cursor__glyph { inset: 0; width: 100%; height: 100%; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+  .cursor__cross { left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px; stroke: var(--cursor-ink); stroke-width: 1; }
+  .cursor__tag {
+    position: absolute; left: 24px; top: 18px; padding: 4px 6px; border-radius: 3px; white-space: nowrap;
+    font: 500 0.625rem/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums;
+    color: var(--cursor-ink); background: rgba(4, 5, 13, 0.78); opacity: 0; transition: opacity 0.2s, translate 0.4s var(--ease);
+  }
+  .cursor.has-tag .cursor__tag { opacity: 1; }
+  .cursor.is-hover .cursor__tag { translate: 12px 10px; }
+  .cursor.is-globe .cursor__ring { width: 46px; height: 46px; margin: -23px 0 0 -23px; border-color: transparent; }
+  .cursor.is-globe .cursor__glyph { opacity: 1; animation: cur-turn 9s linear infinite; }
+  .cursor.is-globe .cursor__cross { opacity: 0.9; }
+  html.is-dragging-globe .cursor.is-globe .cursor__ring { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  html.is-dragging-globe .cursor.is-globe .cursor__glyph { animation-duration: 2.2s; }
+  @keyframes cur-turn { to { rotate: -360deg; } }
+
+  /* ---- nav: "01 Journey" underlined by a micro-route, one tick per stop (src/scripts/atlas/ui/navroute.ts) */
+  .at .site-nav__links a.has-route::after { display: none; }
+  .nav-route { position: absolute; left: 0; right: 0; bottom: -3px; height: 5px; pointer-events: none; }
+  .nav-route::before, .nav-route__fill { content: ""; position: absolute; left: 0; right: 0; top: 2px; height: 1px; }
+  .nav-route::before { background: rgba(226, 230, 255, 0.2); }
+  .nav-route__fill { background: var(--chrome-accent); transform: scaleX(0); transform-origin: left; box-shadow: 0 0 6px rgba(255, 180, 84, 0.55); }
+  .nav-route i { position: absolute; top: 0; width: 1px; height: 5px; margin-left: -0.5px; background: rgba(226, 230, 255, 0.34); transition: background-color 0.3s; }
+  .nav-route i.is-on { background: var(--chrome-accent); }
   /* stop labels, laid out by src/scripts/atlas/labels.ts */
   .lbls { position: fixed; inset: 0; z-index: 1; pointer-events: none; transition: opacity 0.8s; }
   .lbl {
@@ -879,4 +917,20 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .at-footer { position: relative; padding: clamp(6rem, 16vh, 10rem) var(--gutter) 2rem; background: var(--night); }
   .at-footer__cta { display: block; font: 300 clamp(4.5rem, 16vw, 17rem)/0.88 var(--font-display); letter-spacing: -0.045em; text-decoration: none; }
   .at-footer__cta em { color: var(--accent); }
+  /* the last beat: a dashed flight path from the last stop into the "?" (src/scripts/atlas/ui/footer.ts);
+     the footer's own type stays above it */
+  .at-footer > :not(.ft-arc) { position: relative; z-index: 1; }
+  .ft-arc { position: absolute; left: 0; width: 100%; z-index: 0; pointer-events: none; overflow: visible; }
+  .ft-arc__path { fill: none; stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 2 7; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.7)); }
+  .ft-arc__draw { fill: none; stroke: #fff; stroke-width: 14; }
+  .ft-arc__head { fill: var(--amber); filter: drop-shadow(0 0 6px rgba(255, 180, 84, 0.95)); opacity: 0; transition: opacity 0.3s; }
+  .at-footer.is-flying .ft-arc__head { opacity: 1; }
+  .ft-arc__from { fill: var(--amber); opacity: 0; transition: opacity 0.5s; }
+  .ft-arc__from text { fill: var(--muted); font: 500 10px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; }
+  .ft-arc__ring { fill: none; stroke: var(--amber); stroke-width: 1; opacity: 0.5; }
+  .at-footer.is-leaving .ft-arc__from { opacity: 1; }
+  /* the "?" catches the light as the path lands (a filter, so the reveal's mask doesn't clip it) */
+  .ft-q { transition: filter 0.8s; }
+  .at-footer.is-arrived .ft-q { filter: drop-shadow(0 0 22px rgba(255, 180, 84, 0.6)); }
+  @media (prefers-reduced-motion: reduce) { .ft-arc__from, .ft-arc__head, .ft-q { transition: none; } }
 </style>

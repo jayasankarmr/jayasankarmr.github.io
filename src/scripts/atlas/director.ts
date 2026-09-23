@@ -8,8 +8,9 @@ import { Stage } from "./gl/stage";
 import { World } from "./gl/world";
 import { Lod } from "./gl/lod";
 import { Routes } from "./gl/routes";
+import { Bloom } from "./gl/bloom";
 import { applyPose, fitDist, type Pose } from "./camera";
-import { subsolar, toVec } from "./geo";
+import { mapPlane, subsolar, toLatLng, toMap, toVec, type V3 } from "./geo";
 import { buildLegs, type Leg } from "./journey";
 import { introPose, journeyPose, landPose, mixPose, routeState, stopHeading, type Frame, type Where } from "./choreo";
 import { clamp, ease, ramp, smooth, springStep, springs } from "./motion";
@@ -32,6 +33,8 @@ type Rect = { x: number; y: number; w: number; h: number };
 type FrameFn = (d: Director, dt: number) => void;
 
 const HERO_TARGET = { lat: 14, lng: 104 };
+/** bloom strength over the routes (high tier) */
+const BLOOM = 0.9;
 
 export class Director {
   readonly stage: Stage;
@@ -69,6 +72,8 @@ export class Director {
   private sunAt = 0;
 
   private tmp = new Vector3();
+  /** the plane the world unrolls onto (World builds its shader uniforms from the same call) */
+  private plane = mapPlane(22, 82);
   private heroPose: Pose;
   private land0: Pose;
   private spinRate = 2.2; // degrees per second, westward like the real Earth seen from space
@@ -80,6 +85,7 @@ export class Director {
   private frameNo = 0;
   private lowDpr = false;
   private introTl?: gsap.core.Timeline;
+  private bloom?: Bloom;
 
   constructor(readonly canvas: HTMLCanvasElement, readonly places: AtlasPlace[], readonly tier: TierConfig) {
     this.reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -106,6 +112,13 @@ export class Director {
     await this.lod.build(this.stage.scene);
     this.routes.build(this.stage.scene);
     await this.world.compileAll();
+    // high tier: a soft bloom on the routes (?bloom=0 turns it off for comparisons)
+    const body = this.world.bodyMesh;
+    if (this.tier.bloom && body && new URLSearchParams(location.search).get("bloom") !== "0") {
+      const glow = ["routes", "comet"].map((n) => this.stage.scene.getObjectByName(n)).filter((o) => !!o);
+      this.bloom = new Bloom(this.stage, glow, body);
+      await this.bloom.compile();
+    }
     this.world.syncViewport();
     Object.assign(this.base, this.heroFrame());
     Object.assign(this.heroPose, this.base);
@@ -312,6 +325,18 @@ export class Director {
     return out.copy(dir).multiplyScalar(t).add(o).normalize();
   }
 
+  private probe = new Vector3();
+
+  /**
+   * The place under a screen point while the camera is on the globe (not the flat map, not
+   * mid-opening), or null. The context cursor reads it every frame the pointer is on the planet.
+   */
+  latLngAt(clientX: number, clientY: number): { lat: number; lng: number } | null {
+    if (this.mode === "unroll" || this.mode === "map" || this.introProgress < 1) return null;
+    const v = this.hitAt(clientX, clientY, this.probe);
+    return v ? toLatLng([v.x, v.y, v.z]) : null;
+  }
+
   private updateSun() {
     const q = new URLSearchParams(location.search).get("sun");
     const s = subsolar(q ? new Date(q) : new Date());
@@ -489,18 +514,33 @@ export class Director {
     this.routes.sync(this.flying, this.comet);
 
     this.stage.render();
+    if (this.bloom) {
+      // only once there are routes to glow; it fades with them on the map
+      this.bloom.strength = this.mode === "hero" || this.mode === "dive" ? 0 : BLOOM * this.routes.alphaValue;
+      this.bloom.render(this.stage.camera);
+    }
     this.project();
     this.listeners.forEach((fn) => fn(this, dt));
   };
 
-  /** Screen position of every stop (CSS px) and how squarely it faces the camera. */
+  /** Screen position of every stop (CSS px) and how squarely it faces the camera. On the map it
+   *  follows the markers onto the plane (markers.vert.glsl: unroll delay 0.3). */
   private project() {
     const cam = this.stage.camera;
     const { width: w, height: h } = this.stage;
     const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
+    const morph = this.world.u.uMorph.value;
+    const m = morph > 0 ? smooth(clamp(morph * 1.6 - 0.3 * 0.6)) : 0;
+    const up = this.plane.up, v: V3 = [0, 0, 0], n: V3 = [0, 0, 0], q: V3 = [0, 0, 0];
     this.places.forEach((pl, i) => {
-      const v = toVec(pl.lat, pl.lng, 1.0015);
-      const n = toVec(pl.lat, pl.lng);
+      toVec(pl.lat, pl.lng, 1.0015, v);
+      toVec(pl.lat, pl.lng, 1, n);
+      if (m > 0) {
+        toMap(pl.lat, pl.lng, this.plane, 0.0015, q);
+        for (let k = 0; k < 3; k++) { v[k] += (q[k] - v[k]) * m; n[k] += (up[k] - n[k]) * m; }
+        const l = Math.hypot(n[0], n[1], n[2]) || 1;
+        n[0] /= l; n[1] /= l; n[2] /= l;
+      }
       const dx = cx - v[0], dy = cy - v[1], dz = cz - v[2];
       const len = Math.hypot(dx, dy, dz) || 1;
       const facing = (n[0] * dx + n[1] * dy + n[2] * dz) / len;
