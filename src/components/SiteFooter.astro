@@ -1,0 +1,17 @@
+---
+// Shared footer strip — the last row of every page; styled by public/shared/chrome.css.
+import { site, socials, pages, type PageId } from "../data/site";
+
+interface Props { current?: PageId }
+const { current } = Astro.props;
+---
+<div class="site-foot">
+  <ul role="list" aria-label="Pages">
+    {pages.map((p) => <li><a href={p.href} aria-current={p.id === current ? "page" : undefined}>{p.label}</a></li>)}
+  </ul>
+  <ul role="list" class="site-foot__mid" aria-label="Elsewhere">
+    <li><a href={`mailto:${site.email}`}>{site.email}</a></li>
+    {socials.map((s) => <li><a href={s.href} target="_blank" rel="noopener">{s.label} ↗</a></li>)}
+  </ul>
+  <p class="site-foot__note">© 2026 {site.name} · {site.location}</p>
+</div>

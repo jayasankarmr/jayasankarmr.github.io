@@ -1,0 +1,165 @@
+/* ==========================================================================
+   hero.css — full-viewport intro with layered parallax
+   Stacking (back → front): .hero__media → .hero__scrim → .hero__content
+   The scrim is a sibling of the media layer (not a child) so its bottom fade
+   stays anchored to the hero while the image translates behind it.
+   ========================================================================== */
+
+.hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  overflow: hidden; /* clips the oversized media layer while it translates */
+}
+
+/* ---------- media layer (moves slowest — see js/hero.js) ---------- */
+/* the home page's Photography doorway morphs into this (cross-document view transition) */
+.hero__media {
+  view-transition-name: photo-hero;
+  position: absolute;
+  z-index: 0;
+  /* Oversized by 10% top and bottom. The downward parallax drift never pulls
+     an edge into view (the layer only gains coverage as you scroll), but the
+     bleed guards against mobile URL-bar viewport resizes and svh/vh rounding. */
+  inset: -10% 0;
+  will-change: transform;
+}
+
+.hero__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(1.06) contrast(1.02);
+}
+
+/* develop-from-negative canvas (js/develop.js) sits over the photo; the
+   <img> stays hidden until the canvas has handed back to it */
+.hero__develop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+html.hero-develop .hero__media img { opacity: 0; }
+
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* guarantees text contrast over any placeholder image and fades the
+     hero's bottom edge into the page background */
+  background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(10, 10, 10, 0.45) 100%),
+    linear-gradient(180deg,
+      rgba(10, 10, 10, 0.55) 0%,
+      rgba(10, 10, 10, 0.25) 45%,
+      rgba(10, 10, 10, 0.85) 100%);
+}
+
+/* ---------- foreground content (moves near page speed, fades out) ---------- */
+.hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 0 var(--space-gutter);
+  text-align: center;
+  will-change: transform, opacity;
+}
+
+/* kicker and tagline sit at full --ink (not --ink-muted like the other
+   sections' equivalents) — they read over the photograph, not the page */
+.hero__kicker {
+  margin-bottom: 0.9rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.hero__title {
+  font-size: var(--step-display);
+  font-weight: 500;
+  letter-spacing: 0.015em;
+}
+
+.hero__tagline {
+  max-width: 36ch;
+  /* margins here and on .hero__kicker are uneven on purpose: the display
+     font's tall ascent and overflowing descender make the visible gap
+     around .hero__title asymmetric at equal margins, so these compensate
+     to make the two gaps read as equal */
+  margin: 2.6rem auto 0;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* ---------- scroll cue ---------- */
+.hero__scroll-cue {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: var(--text-xs);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hero__scroll-cue::after {
+  content: "";
+  width: 1px;
+  height: 3rem;
+  background: linear-gradient(to bottom, var(--accent), transparent);
+  transform-origin: top;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero__scroll-cue::after {
+    animation: cue-drift 2.8s ease-in-out infinite;
+  }
+
+  @keyframes cue-drift {
+    0%   { transform: scaleY(0); opacity: 0; }
+    35%  { transform: scaleY(1); opacity: 1; }
+    100% { transform: scaleY(1); opacity: 0; }
+  }
+}
+
+/* ---------- entrance reveal ----------
+   Content starts hidden only when JS is running (html.js) and motion is
+   allowed; js/hero.js adds .is-loaded on the first frame to fade it in. */
+@media (prefers-reduced-motion: no-preference) {
+  html.js .hero__content > * {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out);
+  }
+
+  html.js .hero.is-loaded .hero__content > * {
+    opacity: 1;
+    transform: none;
+  }
+
+  html.js .hero__content > :nth-child(2) { transition-delay: 0.12s; }
+  html.js .hero__content > :nth-child(3) { transition-delay: 0.24s; }
+}
+
+/* ---------- mobile: parallax is disabled (js/main.js), simplify layers ---------- */
+@media (max-width: 767px) {
+  .hero__media {
+    inset: 0;          /* no drift, so no bleed needed */
+    will-change: auto;
+  }
+
+  .hero__content { will-change: auto; }
+}

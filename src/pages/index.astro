@@ -1,0 +1,952 @@
+---
+// Home — the journey is the story. A globe is the spine of the page; career and
+// photography each have their own page (/career/, /photography/).
+import { getCollection } from "astro:content";
+import Base from "../layouts/Base.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import "../styles/cursor.css";
+import { site } from "../data/site";
+import { places, type Place } from "../data/travel";
+import { concerts } from "../data/concerts";
+import { now, interests } from "../data/now";
+import { career, commitHash, commitMessage } from "../data/career";
+import { buildLegs, formatKm } from "../scripts/atlas/journey";
+import { code39 } from "../lib/code39";
+
+const posts = (await getCollection("writing", ({ data }) => !data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const coord = (lat: number, lng: number) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? "E" : "W"}`;
+const when = (d: string) => new Date(d.length === 4 ? `${d}-01-01` : `${d}-01`).toLocaleDateString("en-GB", d.length === 4 ? { year: "numeric" } : { month: "short", year: "numeric" });
+const pad = (n: number) => String(n).padStart(2, "0");
+const real = places.filter((p) => !p.placeholder).length;
+// the pass's date line: a range when the visit's last day is known, a count for places on repeat
+const dated = (p: Place) => !p.when ? null
+  : p.recurring ? `Since ${when(p.when)} · on repeat${p.visits ? ` · ${p.visits} visits` : ""}`
+  : p.until ? `${when(p.when)} – ${showDate(p.until)}` : when(p.when);
+const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocaleDateString("en-GB", d.length === 7 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric" });
+const cities = new Set(concerts.map((c) => c.city)).size;
+const home = places[0];
+const chars = (t: string) => [...t];
+// tickets: 3 across, and the last row's stubs widen so no slot is ever left empty (5 → 3 + 2)
+const ticketSpan = (i: number, n: number) => {
+  const r = n % 3, lastRow = i >= n - r;
+  return r && lastRow ? 6 / r : 2;
+};
+const stopIndex = (city: string) => places.findIndex((p) => p.name === city);
+const barcodeText = (c: { when: string }, i: number) => `NO${pad(i + 1)} ${c.when.replace(/-/g, "")}`;
+// the career card's background: the same log /career/ renders, one line per entry
+const gitLog = career.map((c, i) => `${commitHash(c)} ${i === 0 ? "(HEAD -> main) " : ""}${commitMessage(c)}`);
+
+// journey: legs, trips and distances come from the data (src/scripts/atlas/journey.ts)
+const legs = buildLegs(places);
+const n = places.length;
+const railY = (i: number) => (i / (n - 1)) * 1000;
+// the rail is a flight path: stops sit on x = 30 of a 40 × 1000 box, each leg bowing left by its arc height
+const railPath = legs.reduce((d, l, k) => {
+  const bow = Math.min(1, l.height / 0.18) * 26;
+  return d + `Q${(30 - bow * 2).toFixed(2)} ${((railY(k) + railY(k + 1)) / 2).toFixed(1)} 30 ${railY(k + 1).toFixed(1)}`;
+}, "M30 0");
+const MODE = { flight: "By air", train: "By train", road: "By road", bus: "By bus", ferry: "By ferry" } as const;
+// passport guilloche: a few sine-modulated rosettes, drawn once and <use>d by every pass
+const rosette = (R: number, amp: number, k: number, phase: number) => {
+  const pts: string[] = [];
+  for (let s = 0; s <= 96; s++) {
+    const t = (s / 96) * Math.PI * 2;
+    const r = R + amp * Math.sin(k * t + phase);
+    pts.push(`${(120 + r * Math.cos(t)).toFixed(1)} ${(120 + r * Math.sin(t)).toFixed(1)}`);
+  }
+  return `M${pts.join("L")}Z`;
+};
+const guilloche = [[96, 9, 11, 0], [88, 11, 13, 1.1], [78, 8, 9, 0.4], [70, 10, 15, 2.2], [104, 6, 17, 1.7], [60, 7, 7, 0.9]].map(([R, a, k, ph]) => rosette(R, a, k, ph));
+const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat, lng: p.lng, when: p.when && when(p.when), recurring: !!p.recurring, home: !!p.home, leg: !!p.leg }));
+---
+<Base
+  title="Jayasankar M R — engineer & photographer"
+  selfHosted={[
+    { cssVariable: "--font-fraunces", preload: [{ style: "normal" }] },
+    { cssVariable: "--font-manrope" },
+    { cssVariable: "--font-plex-mono" },
+  ]}
+  bodyClass="at"
+>
+  <!-- the opening: an amber pin on Thrissur while its coordinates count up (pure CSS, no JS needed) -->
+  <div class="intro" data-intro aria-hidden="true">
+    <div class="intro__pin" data-intro-pin style={`--to-li: ${Math.trunc(Math.abs(home.lat))}; --to-lf: ${Math.round((Math.abs(home.lat) % 1) * 100)}; --to-gi: ${Math.trunc(Math.abs(home.lng))}; --to-gf: ${Math.round((Math.abs(home.lng) % 1) * 100)};`}>
+      <span class="intro__dot"></span>
+      <span class="intro__coord at-mono" data-ns={home.lat >= 0 ? "N" : "S"} data-ew={home.lng >= 0 ? "E" : "W"}></span>
+    </div>
+  </div>
+
+  <canvas class="at-globe" data-globe aria-hidden="true"></canvas>
+  <div class="lbls" data-labels aria-hidden="true"></div>
+
+  <SiteNav current="home"><span data-pos>{coord(places[0].lat, places[0].lng)} · {places[0].name}</span></SiteNav>
+
+  <main id="main">
+    <!-- ============ HERO ============ -->
+    <section class="at-hero" data-hero aria-labelledby="at-name">
+      <div class="at-hero__col">
+        <p class="at-mono at-kicker in-kicker">An atlas of one — Vol. 01</p>
+        <h1 id="at-name" class="at-hero__title">
+          <span class="sr-only">Jayasankar, from Kerala, outward.</span>
+          <span class="at-hero__line in-mask" aria-hidden="true">{chars("Jayasankar").map((c, i) => <span class="ch" style={`--i: ${i}`}><span class="ch__sz">{c}</span><span class="ch__g">{c}</span></span>)}</span>
+          <span class="at-hero__line at-hero__line--it" aria-hidden="true"><em class="in-sweep">from Kerala, outward.</em></span>
+        </h1>
+        <p class="at-hero__intro in-up">{site.intro}</p>
+        <div class="at-hero__ctas">
+          <a class="at-btn at-btn--solid in-cta" style="--k: 0" href="#journey" data-magnetic="0.25">Begin the journey <span aria-hidden="true">↓</span></a>
+          <a class="at-btn in-cta" style="--k: 1" href="/career/" data-magnetic="0.25">Career &amp; code <span aria-hidden="true">→</span></a>
+          <a class="at-btn in-cta" style="--k: 2" href="/photography/" data-magnetic="0.25">Photography <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+      <div class="at-hero__hint in-late" aria-hidden="true">
+        <svg class="at-gesture" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <circle cx="24" cy="22" r="13" opacity="0.45" />
+          <ellipse class="at-gesture__meridian" cx="24" cy="22" rx="6" ry="13" opacity="0.8" />
+          <path d="M8 35.5c10 5 22 5 32 0" opacity="0.55" />
+          <path d="M36.2 33.4l3.8 2.1-2.4 3.4" opacity="0.55" />
+          <circle class="at-gesture__dot" cx="24" cy="38" r="2.1" fill="currentColor" stroke="none" />
+        </svg>
+        <span class="at-mono">Drag</span>
+      </div>
+      <div class="at-globe-ctl" data-globe-ctl tabindex="0" role="group" aria-roledescription="interactive globe" aria-label="Globe of the journey. Arrow keys turn it; Home recentres."></div>
+    </section>
+
+    <!-- ============ JOURNEY ============ -->
+    <section class="jr" id="journey" aria-labelledby="jr-title" data-journey data-stops={JSON.stringify(stopData)}>
+      <h2 id="jr-title" class="sr-only">Journey</h2>
+      <!-- the journey for screen readers: every stop, in order (the visual deck mirrors it) -->
+      <ol class="jr-sr sr-only" role="list">
+        {places.map((p, i) => (
+          <li>
+            <h3>Stop {i + 1} of {n}: {p.name}</h3>
+            <p>{p.region}. {p.home ? "Home." : dated(p) ? `${dated(p)}.` : ""} {coord(p.lat, p.lng)}.{i > 0 && ` ${formatKm(legs[i - 1].km)} from ${places[i - 1].name}${legs[i - 1].overland ? ", overland" : ""}.`}</p>
+            <p>{p.note}</p>
+            {p.link && <a href={p.link} target="_blank" rel="noopener">See the trip to {p.name}</a>}
+          </li>
+        ))}
+      </ol>
+      <div class="jr__track" data-track>
+        {places.map((_, i) => <span class="jr__snap" data-snap={i} aria-hidden="true"></span>)}
+        <div class="jr__stage" data-stage>
+          <nav class="jr-rail" data-rail aria-label="Journey stops">
+            <svg class="jr-rail__path" viewBox="0 0 40 1000" preserveAspectRatio="none" aria-hidden="true">
+              <path class="jr-rail__route" d={railPath} vector-effect="non-scaling-stroke" />
+              <path class="jr-rail__flown" data-rail-fill d="M30 0" vector-effect="non-scaling-stroke" />
+            </svg>
+            <ol class="jr-rail__stops" role="list">
+              {places.map((p, i) => (
+                <li style={`--at: ${((i / (n - 1)) * 100).toFixed(3)}%`}>
+                  <button type="button" class="jr-rail__stop" data-rail-stop={i} tabindex={i === 0 ? 0 : -1}>
+                    <span class="jr-rail__node" aria-hidden="true"></span>
+                    <span class="sr-only">Stop {i + 1}: </span>
+                    <span class="jr-rail__name">{p.name}</span>
+                    <span class="jr-rail__date">{p.home ? "Home" : p.when ? when(p.when) : ""}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+            <span class="jr-rail__plane" data-rail-plane aria-hidden="true">
+              <svg viewBox="0 0 16 16"><path d="M8 1.5 9.6 7l4.9 2.4v1.4L9.6 9.4 9.2 12.6l1.6 1.2V15L8 14.2 5.2 15v-1.2l1.6-1.2-.4-3.2-4.9 1.4V9.4L6.4 7Z" fill="currentColor" /></svg>
+              <span class="jr-rail__alt at-mono" data-rail-alt>Alt —</span>
+            </span>
+          </nav>
+          <div class="jr-deck" data-deck aria-hidden="true">
+            <svg width="0" height="0" class="jr-defs" aria-hidden="true">
+              <defs>
+                <!-- the stamp's ink bleed: animated from a heavy spread down to a slight wobble -->
+                <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n" />
+                  <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G" data-ink />
+                </filter>
+                <symbol id="guilloche" viewBox="0 0 240 240">
+                  {guilloche.map((d) => <path d={d} />)}
+                </symbol>
+              </defs>
+            </svg>
+            {places.map((p, i) => {
+              const leg = i > 0 ? legs[i - 1] : null;
+              const stamp = p.home ? "Home" : p.when ? when(p.when) : p.region;
+              return (
+                <article class:list={["pass", { "is-home": p.home, "is-tba": p.placeholder, "is-current": i === 0, "has-photo": !!p.photo }]} data-card={i}>
+                  <div class="pass__face" data-face>
+                    <div class="pass__body">
+                      <svg class="pass__guilloche" aria-hidden="true"><use href="#guilloche" /></svg>
+                      <header class="pass__head">
+                        <p class="pass__no at-mono">Stop <b>{pad(i + 1)}</b> / {pad(n)}</p>
+                        <p class="pass__when at-mono">{p.home ? "Home" : dated(p) ?? p.region}</p>
+                      </header>
+                      <h3 class="pass__name" data-name>{p.name}</h3>
+                      <p class="pass__coord at-mono" data-coord>{coord(p.lat, p.lng)} · {p.region}</p>
+                      <p class="pass__note" data-note>{p.note}</p>
+                      {p.photo && (
+                        <figure class="pass__photo" data-photo>
+                          <!-- loaded when the pass is first shown (the deck stacks every pass in one place) -->
+                          <img data-src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} decoding="async" />
+                          <noscript><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" /></noscript>
+                        </figure>
+                      )}
+                      {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
+                    </div>
+
+                    <svg class="pass__stamp" viewBox="0 0 120 120" data-stamp aria-hidden="true">
+                      <defs><path id={`ring-${i}`} d="M60 60m-43 0a43 43 0 1 1 86 0a43 43 0 1 1-86 0" /></defs>
+                      <g filter="url(#ink)">
+                        <circle cx="60" cy="60" r="56" class="pass__stamp-rim" />
+                        <circle cx="60" cy="60" r="34" class="pass__stamp-inner" />
+                        <text class="pass__stamp-ring"><textPath href={`#ring-${i}`} textLength="266" lengthAdjust="spacing">{`Stop ${pad(i + 1)} of ${pad(n)} · ${p.region} · An atlas of one ·`}</textPath></text>
+                        <text x="60" y="61" class="pass__stamp-no">{pad(i + 1)}</text>
+                        <text x="60" y="78" class="pass__stamp-date">{stamp}</text>
+                      </g>
+                    </svg>
+                    <footer class="pass__stub at-mono">
+                      <span class="pass__flight" aria-hidden="true"><span class="pass__flight-fill"></span><svg viewBox="0 0 16 16"><path d="M8 1.5 9.6 7l4.9 2.4v1.4L9.6 9.4 9.2 12.6l1.6 1.2V15L8 14.2 5.2 15v-1.2l1.6-1.2-.4-3.2-4.9 1.4V9.4L6.4 7Z" fill="currentColor" /></svg></span>
+                      {leg ? (
+                        <>
+                          <span class="pass__leg"><span>From {places[i - 1].name}</span><span aria-hidden="true">→</span></span>
+                          <span>{formatKm(leg.km)}</span>
+                          {p.mode ? <span>{MODE[p.mode]}</span> : leg.overland && <span>Overland</span>}
+                          <span>Trip {pad(leg.trip)}</span>
+                        </>
+                      ) : (
+                        <span>Home · {p.region}</span>
+                      )}
+                    </footer>
+                    <span class="pass__sheen" aria-hidden="true"></span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <p class="sr-only" aria-live="polite" data-live></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LOGBOOK ============ -->
+    <section class="at-notebook lb" id="notebook" aria-labelledby="lb-title">
+      <header class="lb__head" data-lb-head>
+        <p class="at-mono at-kicker">The logbook</p>
+        <h2 id="lb-title" class="lb__title"><span data-lb-words>Everything I carry</span> <em class="lb-sweep">between the stops.</em></h2>
+      </header>
+
+      <div class="lb__grid" data-lb-grid>
+        <div class="tile lb-route" data-tile>
+          <h3 class="lb__h">The route <span class="at-mono">{real} places · more to come</span></h3>
+          <div class="lb-route__scroll" tabindex="0" role="region" aria-label="The route: places, in order" data-lenis-prevent data-route-scroll>
+            <span class="lb-route__track" aria-hidden="true"><span class="lb-route__fill" data-route-fill></span></span>
+            <ol role="list" class="lb-route__list">
+              {places.map((p, i) => (
+                <li class:list={[{ "is-home": p.home, "is-tba": p.placeholder }]} data-route-stop={i}>
+                  <span class="at-mono">{p.home ? "Home" : p.placeholder ? "TBA" : dated(p) ?? "Date to add"}</span>
+                  <strong>{p.name}</strong>
+                  <span>{p.region}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+
+        <a class="tile lb-door lb-door--career" href="/career/" data-tile data-door="career">
+          <span class="lb-door__dots" aria-hidden="true"></span>
+          <pre class="lb-door__log" aria-hidden="true" data-gitlog={JSON.stringify(gitLog)}></pre>
+          <span class="at-mono">Page 02</span>
+          <strong>Career <em>&amp; projects</em></strong>
+          <span class="lb-door__desc">Where I’ve worked, what I’ve shipped, and the code behind it — read as a git log.</span>
+          <span class="lb-door__enter" aria-hidden="true" data-magnet><span>Enter</span><span class="lb-door__arrow">→</span></span>
+        </a>
+
+        <a class="tile lb-door lb-door--photo" href="/photography/" data-tile data-door="photo">
+          <span class="lb-door__media" data-door-media><img src="/photography/images/hero.jpg" alt="" loading="lazy" decoding="async" /></span>
+          <span class="lb-door__shade" aria-hidden="true"></span>
+          <span class="at-mono">Page 03</span>
+          <strong>Photo<em>graphy</em></strong>
+          <span class="lb-door__desc">Travel, architecture, wildlife and street — developed from the negative.</span>
+          <span class="lb-door__enter" aria-hidden="true" data-magnet><span>Enter</span><span class="lb-door__arrow">→</span></span>
+        </a>
+
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Now <span class="at-mono">{now.updated}</span></h3>
+          <ul role="list" class="at-bullets">{now.items.map((t) => <li>{t}</li>)}</ul>
+        </div>
+
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Writing</h3>
+          {posts.slice(0, 3).map((p) => (
+            <a class="at-post" href={`/writing/${p.id}/`} data-cursor="Read">
+              <strong>{p.data.title}</strong>
+              <span>{p.data.summary}</span>
+            </a>
+          ))}
+        </div>
+
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Interests</h3>
+          <dl class="at-interests">
+            {interests.map((i) => <div><dt>{i.name}</dt><dd>{i.note}</dd></div>)}
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LIVE ============ -->
+    <section class="at-live tk" id="live" aria-labelledby="at-live-title">
+      <header class="tk__head">
+        <p class="at-mono at-kicker" data-reveal>Ticket stubs</p>
+        <div class="tk__titlewrap">
+          <svg class="tk__wave" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true">
+            <path d={Array.from({ length: 241 }, (_, k) => { const x = k * 5; const y = 60 + Math.sin(x * 0.021) * 22 * Math.sin(x * 0.0041 + 1) + Math.sin(x * 0.083) * 7; return `${k ? "L" : "M"}${x} ${y.toFixed(1)}`; }).join("")} />
+          </svg>
+          <h2 id="at-live-title" class="at-live__title" data-reveal="split">Some stops were <em>for the music.</em></h2>
+        </div>
+        <p class="at-mono at-live__count" data-reveal>{concerts.length} shows · {cities} cities</p>
+      </header>
+      <ol role="list" class="tk__grid" data-tickets>
+        {concerts.map((c, i) => {
+          const where = c.event ? `${c.event}, ${c.city}` : c.city;
+          const bc = code39(barcodeText(c, i));
+          const stop = stopIndex(c.city);
+          return (
+            <li class="tk__slot" style={`--span: ${ticketSpan(i, concerts.length)}`}>
+              {/* named by its front; the back repeats it, except venue and note (when they exist),
+                  which reach screen readers as the button's description */}
+              <button type="button" class="ticket" data-ticket data-stop={stop >= 0 ? stop : undefined} aria-pressed="false"
+                aria-describedby={[c.venue && `tk${i}-vl tk${i}-v`, c.note && `tk${i}-nl tk${i}-n`].filter(Boolean).join(" ") || undefined}>
+                <span class="ticket__inner">
+                  <span class="ticket__face ticket__front">
+                    <span class="ticket__main">
+                      <span class="at-mono ticket__admit"><span aria-hidden="true">Admit one · </span>No. {pad(i + 1)}</span>
+                      <strong class="ticket__artist">{c.artist}</strong>
+                      <span class="ticket__where">{where}</span>
+                    </span>
+                    <span class="ticket__stub">
+                      <time class="at-mono" datetime={c.when}>{showDate(c.when)}</time>
+                    </span>
+                    <span class="ticket__foil"></span>
+                  </span>
+                  <span class="ticket__face ticket__back" aria-hidden="true">
+                    <span class="ticket__back-grid at-mono">
+                      <span>No.</span><span>{pad(i + 1)} / {pad(concerts.length)}</span>
+                      <span>Artist</span><span>{c.artist}</span>
+                      <span id={`tk${i}-vl`}>Venue</span><span id={`tk${i}-v`}>{c.venue ?? c.event ?? c.city}</span>
+                      <span>City</span><span>{c.city}</span>
+                      <span>Date</span><span>{showDate(c.when)}</span>
+                      {c.note && <><span id={`tk${i}-nl`}>Note</span><span id={`tk${i}-n`}>{c.note}</span></>}
+                    </span>
+                    <svg class="ticket__barcode" viewBox={`0 0 ${bc.width} 40`} preserveAspectRatio="none">
+                      <path d={bc.bars.map(([x, w]) => `M${x} 0h${w}v40h-${w}z`).join("")} />
+                    </svg>
+                    <span class="at-mono ticket__code">{barcodeText(c, i)}</span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="at-footer" id="contact">
+      <p class="at-mono at-kicker">Next stop</p>
+      <a class="at-footer__cta" href={`mailto:${site.email}`} data-reveal="chars" data-cursor="Write">Where <em>next?</em></a>
+      <SiteFooter current="home" />
+    </footer>
+  </main>
+</Base>
+
+<script>
+  import "../scripts/pages/home";
+</script>
+
+<style is:global>
+  body.at {
+    --night: #04050d;
+    --night-2: #0a0c1f;
+    --ink: #eef0ff;
+    --muted: rgba(226, 230, 255, 0.62);
+    --faint: rgba(200, 208, 255, 0.15);
+    /* warm accent against a cool planet: route, pins, kickers. The ticket section blends the
+       accent toward pink (--accent-mix, scrubbed by src/scripts/atlas/ui/tickets.ts) */
+    --amber: #ffb454;
+    --pink: #ff6f91;
+    --accent-mix: 0;
+    --accent: var(--amber);
+    --accent-2: var(--pink);
+    /* globe: land shades cyan (north) → violet (south) inside an electric-blue halo */
+    --land-n: #6ff2e0;
+    --land-s: #9d7bff;
+    --atmo: #4d7cff;
+    --font-display: var(--font-fraunces);
+    --font-body: var(--font-manrope);
+    --font-mono: var(--font-plex-mono);
+    --gutter: clamp(1.25rem, 4vw, 3.5rem);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --cursor-ink: var(--accent);
+    --cursor-fill: var(--accent);
+    --cursor-label: var(--night);
+    --focus: var(--accent);
+    --chrome-ink: var(--ink);
+    --chrome-muted: var(--muted);
+    --chrome-line: var(--faint);
+    --chrome-bg: rgba(4, 5, 13, 0.72);
+    --chrome-accent: var(--accent);
+    background:
+      radial-gradient(90% 70% at 78% 18%, rgba(77, 124, 255, 0.22) 0%, transparent 60%) fixed,
+      radial-gradient(70% 60% at 10% 90%, rgba(157, 123, 255, 0.16) 0%, transparent 60%) fixed,
+      var(--night);
+    color: var(--ink);
+    font: 400 1rem/1.65 var(--font-body);
+  }
+  /* The blend only reaches what is on screen with the tickets: the nav, the section head and
+     the footer. Re-declaring the chain on those three keeps each scrubbed frame's style work to
+     their subtrees; a variable changed on body would restyle the whole document every frame. */
+  .at .site-nav, .at .tk__head, .at .at-footer, .at .cursor {
+    --accent: color-mix(in oklab, var(--pink) calc(var(--accent-mix) * 100%), var(--amber));
+    --chrome-accent: var(--accent);
+    --focus: var(--accent);
+    --cursor-ink: var(--accent);
+    --cursor-fill: var(--accent);
+  }
+  .at ::selection { background: var(--accent); color: var(--night); }
+  .at em { font-style: italic; }
+  .at-mono { font: 500 0.6875rem/1.4 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; }
+  .at-kicker { color: var(--accent); margin-bottom: 1.25rem; }
+
+  /* ---- the opening: "From Kerala, outward" ----
+     Everything here is CSS and starts at first paint, so the name never waits for JavaScript or
+     WebGL (it's the LCP element). The globe's pull-back and assembly join from JS when the scene
+     is ready (src/scripts/pages/home.ts). Repeat visits in a session (html.intro-seen) get a
+     short version; reduced motion gets the end state; any input fast-forwards (html.intro-skip). */
+  @property --li { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --lf { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --gi { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --gf { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --sweep { syntax: "<percentage>"; initial-value: 115%; inherits: false; }
+  @property --ft { syntax: "<length>"; initial-value: 0rem; inherits: false; }
+  @property --fb { syntax: "<length>"; initial-value: 3rem; inherits: false; }
+  body.at { --t0: 0.55s; }
+  .intro { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  .intro__pin { position: absolute; left: 0; top: 0; translate: 50vw 50svh; animation: intro-out 0.5s ease-in 1.55s both; }
+  /* once the globe's own intro runs, JS rides the pin along Thrissur as the planet recedes */
+  html.intro-gl .intro__pin { animation: none; translate: none; }
+  .intro__dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 18px rgba(255, 180, 84, 0.95); animation: intro-in 0.25s ease-out backwards; }
+  .intro__dot::before, .intro__dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--accent); animation: intro-pulse 1.3s var(--ease) infinite; }
+  .intro__dot::after { animation-delay: 0.65s; }
+  .intro__coord {
+    position: absolute; left: 1.1rem; top: 0; translate: 0 -50%; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums;
+    --li: var(--to-li); --lf: var(--to-lf); --gi: var(--to-gi); --gf: var(--to-gf);
+    animation: intro-in 0.25s ease-out 0.05s backwards, intro-count 0.95s var(--ease) 0.1s backwards;
+    counter-reset: li var(--li) lf var(--lf) gi var(--gi) gf var(--gf);
+  }
+  .intro__coord::before { content: counter(li, decimal-leading-zero) "." counter(lf, decimal-leading-zero) "°" attr(data-ns) " " counter(gi, decimal-leading-zero) "." counter(gf, decimal-leading-zero) "°" attr(data-ew); }
+  @keyframes intro-count { from { --li: 0; --lf: 0; --gi: 0; --gf: 0; } }
+  @keyframes intro-in { from { opacity: 0; } }
+  @keyframes intro-out { to { opacity: 0; } }
+  @keyframes intro-pulse { from { transform: scale(1); opacity: 0.9; } to { transform: scale(4.2); opacity: 0; } }
+
+  /* the name: each character rises out of a mask while Fraunces moves from text to display optical
+     size. A hidden twin at the final settings sizes each character's box; the visible glyph sits
+     over it at zero width, so the axes can animate without moving the layout (no shift, no wrap). */
+  .in-mask { overflow: clip; white-space: nowrap; padding-bottom: 0.1em; margin-bottom: -0.1em; }
+  .ch { display: inline-block; position: relative; animation: ch-rise 1.05s var(--ease) backwards; animation-delay: calc(var(--t0) + var(--i) * 0.036s); }
+  .ch__sz { visibility: hidden; }
+  .ch__g { position: absolute; left: 50%; top: 0; translate: -50% 0; animation: ch-axes 1.05s var(--ease) backwards; animation-delay: inherit; }
+  @keyframes ch-rise { from { transform: translateY(1.02em) rotate(4deg); } }
+  @keyframes ch-axes { from { font-variation-settings: "SOFT" 50, "opsz" 9, "wght" 200; } }
+  /* "from Kerala, outward.": written in by a sweep of amber light */
+  .in-sweep {
+    background: linear-gradient(90deg, var(--accent) calc(var(--sweep) - 16%), #fff2da calc(var(--sweep) - 4%), var(--accent) var(--sweep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    animation: sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) calc(var(--t0) + 0.72s) backwards;
+  }
+  @keyframes sweep { from { --sweep: -18%; } to { --sweep: 115%; } }
+  .in-kicker { animation: in-fade 0.9s ease-out calc(var(--t0) - 0.2s) backwards; }
+  /* the intro paragraph is the page's largest text (its LCP): it arrives while the name is still rising */
+  .in-up { animation: in-rise 0.9s var(--ease) calc(var(--t0) + 0.3s) backwards; }
+  /* CTAs rise through a clip (never through opacity, so their contrast is never mid-fade) */
+  .in-cta { animation: in-clip 0.9s var(--ease) calc(var(--t0) + 1.35s + var(--k) * 0.08s) backwards; }
+  .in-late { animation: in-fade 1s ease-out calc(var(--t0) + 2s) backwards; }
+  body.at .site-nav { animation: in-fade 0.9s ease-out calc(var(--t0) + 1.6s) backwards; }
+  @keyframes in-fade { from { opacity: 0; } }
+  @keyframes in-rise { from { opacity: 0; transform: translateY(14px); } }
+  @keyframes in-clip { from { clip-path: inset(0 0 100% 0 round 999px); transform: translateY(14px); } to { clip-path: inset(0 round 999px); transform: none; } }
+
+  /* repeat visit this session: a quick settle, no pin */
+  html.intro-seen body.at { --t0: 0.05s; }
+  html.intro-seen .intro { display: none; }
+  html.intro-seen .ch, html.intro-seen .ch__g { animation-duration: 0.7s; }
+  html.intro-seen .ch { animation-delay: calc(var(--t0) + var(--i) * 0.018s); }
+  html.intro-seen .in-sweep { animation-duration: 0.7s; animation-delay: 0.25s; }
+  html.intro-seen .in-up { animation-delay: 0.1s; }
+  html.intro-seen .in-cta { animation-delay: 0.45s; }
+  html.intro-seen body.at .site-nav, html.intro-seen .in-late { animation-delay: 0.3s; }
+  @media (prefers-reduced-motion: reduce) {
+    .intro { display: none; }
+    .ch, .ch__g, .in-sweep, .in-kicker, .in-up, .in-cta, .in-late, body.at .site-nav { animation: none; }
+  }
+
+  /* ---- globe + labels ---- */
+  .at-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; transition: opacity 0.8s; }
+  .at-globe:not(.is-live) { opacity: 0; }
+  .at-globe.is-away, .lbls.is-away { opacity: 0; pointer-events: none; }
+  /* no WebGL: the build-time map (src/pages/atlas-map.svg.ts) as a quiet backdrop */
+  .at-map-static { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.42; pointer-events: none; }
+  html.no-globe .at-hero__hint { display: none; }
+  html:not(.has-cursor) .at-globe { pointer-events: none; }
+  /* the context cursor draws its own turning glyph over the planet */
+  html.has-cursor .at-globe, html.has-cursor.is-dragging-globe, html.has-cursor.is-dragging-globe .at-globe { cursor: none; }
+  /* film: vignette + grain over the scene, under the page (src/scripts/atlas/ui/film.ts) */
+  .at-film {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s;
+    background: radial-gradient(125% 95% at 50% 48%, transparent 58%, rgba(2, 3, 9, 0.55) 100%);
+  }
+  .at-film.is-on { opacity: 1; }
+  .at-film.has-grain::after { content: ""; position: absolute; inset: 0; opacity: 0.08; mix-blend-mode: soft-light; background: var(--grain, none) 0 0 / 128px 128px; }
+
+  /* ---- the context cursor (src/scripts/atlas/ui/cursor.ts): small tags beside the pointer instead
+     of the shared filled disc; on the planet, a turning glyph and a crosshair with live lat/long */
+  .cursor__glyph, .cursor__cross { position: absolute; fill: none; stroke: currentColor; opacity: 0; transition: opacity 0.25s; overflow: visible; }
+  .cursor__glyph { inset: 0; width: 100%; height: 100%; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+  .cursor__cross { left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px; stroke: var(--cursor-ink); stroke-width: 1; }
+  .cursor__tag {
+    position: absolute; left: 24px; top: 18px; padding: 4px 6px; border-radius: 3px; white-space: nowrap;
+    font: 500 0.625rem/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums;
+    color: var(--cursor-ink); background: rgba(4, 5, 13, 0.78); opacity: 0; transition: opacity 0.2s, translate 0.4s var(--ease);
+  }
+  .cursor.has-tag .cursor__tag { opacity: 1; }
+  .cursor.is-hover .cursor__tag { translate: 12px 10px; }
+  .cursor.is-globe .cursor__ring { width: 46px; height: 46px; margin: -23px 0 0 -23px; border-color: transparent; }
+  .cursor.is-globe .cursor__glyph { opacity: 1; animation: cur-turn 9s linear infinite; }
+  .cursor.is-globe .cursor__cross { opacity: 0.9; }
+  html.is-dragging-globe .cursor.is-globe .cursor__ring { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  html.is-dragging-globe .cursor.is-globe .cursor__glyph { animation-duration: 2.2s; }
+  @keyframes cur-turn { to { rotate: -360deg; } }
+
+  /* ---- nav: "01 Journey" underlined by a micro-route, one tick per stop (src/scripts/atlas/ui/navroute.ts) */
+  .at .site-nav__links a.has-route::after { display: none; }
+  .nav-route { position: absolute; left: 0; right: 0; bottom: -3px; height: 5px; pointer-events: none; }
+  .nav-route::before, .nav-route__fill { content: ""; position: absolute; left: 0; right: 0; top: 2px; height: 1px; }
+  .nav-route::before { background: rgba(226, 230, 255, 0.2); }
+  .nav-route__fill { background: var(--chrome-accent); transform: scaleX(0); transform-origin: left; box-shadow: 0 0 6px rgba(255, 180, 84, 0.55); }
+  .nav-route i { position: absolute; top: 0; width: 1px; height: 5px; margin-left: -0.5px; background: rgba(226, 230, 255, 0.34); transition: background-color 0.3s; }
+  .nav-route i.is-on { background: var(--chrome-accent); }
+  /* stop labels, laid out by src/scripts/atlas/labels.ts */
+  .lbls { position: fixed; inset: 0; z-index: 1; pointer-events: none; transition: opacity 0.8s; }
+  .lbl {
+    position: absolute; top: 0; left: 0; opacity: 0; will-change: transform, opacity; white-space: nowrap;
+    padding: 2px 4px; font: 500 0.6875rem/1.2 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(226, 230, 255, 0.84); text-shadow: 0 0 2px var(--night), 0 0 8px rgba(4, 5, 13, 0.95);
+  }
+  .lbl.is-reached { color: rgba(255, 226, 184, 0.9); }
+  .lbl.is-active { font-size: 0.875rem; letter-spacing: 0.12em; color: var(--accent); text-shadow: 0 0 2px var(--night), 0 0 16px rgba(255, 180, 84, 0.55); }
+  .lbl--cluster {
+    display: flex; gap: 0.55em; align-items: center; padding: 4px 9px 4px 10px; border: 1px solid rgba(200, 208, 255, 0.26); border-radius: 999px;
+    background: rgba(4, 5, 13, 0.78); color: rgba(226, 230, 255, 0.9); text-shadow: none;
+  }
+  .lbl__count { color: var(--accent); }
+  .lbl-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .lbl-lines path { fill: none; stroke: rgba(226, 230, 255, 0.5); stroke-width: 1; }
+
+  main { position: relative; z-index: 2; pointer-events: none; }
+  main a, main button, .pass, .at-notebook, .at-footer { pointer-events: auto; }
+
+  /* ---- hero ---- */
+  .at-hero { min-height: 100svh; display: grid; align-items: center; padding: 7rem var(--gutter) 4rem; position: relative; }
+  .at-hero__col { max-width: 40rem; }
+  .at-hero__title { font: 300 clamp(3.75rem, 10vw, 9.5rem)/0.9 var(--font-display); letter-spacing: -0.035em; font-variation-settings: "SOFT" 50, "opsz" 144; }
+  .at-hero__line { display: block; }
+  .at-hero__line--it { font-size: 0.42em; letter-spacing: -0.01em; margin-top: 0.35em; color: var(--accent); line-height: 1.05; }
+  .at-hero__intro { margin-top: 2rem; max-width: 30rem; color: var(--muted); font-size: 1.0625rem; }
+  .at-hero__ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2.25rem; }
+  .at-btn { display: inline-flex; gap: 0.6rem; align-items: center; padding: 0.85rem 1.4rem; border: 1px solid var(--faint); border-radius: 999px; text-decoration: none; font-weight: 500; font-size: 0.9375rem; backdrop-filter: blur(6px); transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+  .at-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .at-btn--solid { background: var(--accent); color: var(--night); border-color: var(--accent); box-shadow: 0 0 32px rgba(255, 180, 84, 0.35); }
+  .at-btn--solid:hover { background: transparent; }
+  /* drag hint: a globe whose meridian turns while a fingertip sweeps under it */
+  .at-hero__hint { position: absolute; right: var(--gutter); bottom: 1.75rem; display: flex; align-items: center; gap: 0.6rem; color: var(--muted); }
+  .at-gesture { width: 2.75rem; height: 2.75rem; color: var(--ink); overflow: visible; }
+  .at-gesture__meridian { animation: at-meridian 3.2s var(--ease) infinite; }
+  .at-gesture__dot { color: var(--accent); animation: at-sweep 3.2s var(--ease) infinite; }
+  @keyframes at-meridian { 0%, 100% { rx: 2px; } 50% { rx: 11px; } }
+  @keyframes at-sweep { 0%, 100% { transform: translateX(-9px); } 50% { transform: translateX(9px); } }
+  @media (hover: none), (prefers-reduced-motion: reduce) { .at-gesture__meridian, .at-gesture__dot { animation: none; } }
+  @media (hover: none) { .at-hero__hint { display: none; } }
+  /* keyboard handle for the globe: invisible until focused, then a ring that hugs the planet */
+  .at-globe-ctl {
+    position: fixed; z-index: 1; left: var(--x, 70%); top: var(--y, 50%); width: calc(var(--r, 20rem) * 2); height: calc(var(--r, 20rem) * 2);
+    translate: -50% -50%; border-radius: 50%; pointer-events: none; outline: none;
+  }
+  .at-globe-ctl:focus-visible { box-shadow: 0 0 0 2px var(--accent), 0 0 0 10px rgba(255, 180, 84, 0.16), 0 0 60px rgba(255, 180, 84, 0.25); }
+  html.is-dragging-globe, html.is-dragging-globe .at-globe { cursor: grabbing; }
+  @media (max-width: 767px) {
+    .at-hero { align-items: end; padding-top: 55svh; }
+  }
+
+  /* ---- journey ----
+     Default (no JS, reduced motion, no WebGL): a readable list of passes over the globe.
+     .is-deck (rich motion): a tall scroll track under a sticky 100svh stage — rail, card slot,
+     and the globe behind — driven by src/scripts/atlas/ui/journey.ts. */
+  .jr { position: relative; }
+  .jr__track { position: relative; padding: 4rem var(--gutter); }
+  .jr__snap { display: none; }
+  .jr-rail { display: none; }
+  .jr-deck { display: grid; gap: 1.25rem; max-width: 28rem; }
+  .jr-sr a:focus { position: fixed; top: 5rem; left: var(--gutter); z-index: 50; width: auto; height: auto; clip: auto; padding: 0.6rem 1rem; background: var(--night-2); color: var(--accent); }
+
+  .pass { position: relative; pointer-events: auto; }
+  /* a passport page crossed with a boarding pass: guilloche body, ink stamp, a perforated stub */
+  .pass__face { position: relative; border-radius: 14px; filter: drop-shadow(0 28px 50px rgba(0, 0, 0, 0.5)); --mx: 70%; --my: 20%; }
+  .pass__body {
+    position: relative; overflow: hidden; padding: clamp(1.4rem, 2.4vw, 1.9rem) clamp(1.4rem, 2.4vw, 1.9rem) 1.25rem;
+    border: 1px solid rgba(255, 180, 84, 0.3); border-bottom: 0; border-radius: 14px 14px 0 0;
+    background: linear-gradient(165deg, #161b3d 0%, #0d1129 58%, #0a0d22 100%);
+    /* the perforation's two punched notches */
+    mask: radial-gradient(circle at 0 100%, #0000 9px, #000 9.5px) left / 51% 100% no-repeat,
+          radial-gradient(circle at 100% 100%, #0000 9px, #000 9.5px) right / 51% 100% no-repeat;
+  }
+  .pass__guilloche { position: absolute; right: -5.5rem; top: -4rem; width: 17rem; height: 17rem; fill: none; stroke: rgba(255, 180, 84, 0.075); stroke-width: 0.7; pointer-events: none; }
+  .pass.is-home .pass__guilloche { stroke: rgba(111, 242, 224, 0.08); }
+  .pass__head { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding-right: 5.6rem; color: var(--accent); }
+  .pass__no { white-space: nowrap; }
+  .pass__no b { font-weight: 500; color: var(--ink); }
+  .pass__when { color: rgba(255, 180, 84, 0.85); }
+  .pass__name { position: relative; margin-top: 1rem; font: 300 clamp(2.5rem, 4.4vw, 3.9rem)/0.95 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; font-variation-settings: "opsz" 144; }
+  .pass__coord { position: relative; margin-top: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pass__note { position: relative; margin-top: 1rem; font: italic 400 clamp(1.05rem, 1.5vw, 1.2rem)/1.45 var(--font-display); }
+  .pass__photo { position: relative; margin-top: 1.1rem; border-radius: 4px; overflow: hidden; }
+  .pass__photo img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+  .pass__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pass__link { position: relative; display: inline-block; margin-top: 1rem; color: var(--land-n); text-decoration: none; }
+  .pass__stamp {
+    position: absolute; top: -0.9rem; right: -0.7rem; z-index: 2; width: 6.4rem; height: 6.4rem; rotate: -9deg;
+    color: rgba(255, 180, 84, 0.88); mix-blend-mode: screen; pointer-events: none; overflow: visible;
+  }
+  .pass.is-home .pass__stamp { color: rgba(111, 242, 224, 0.85); }
+  .pass__stamp-rim { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-dasharray: 1 0; }
+  .pass__stamp-inner { fill: none; stroke: currentColor; stroke-width: 0.9; }
+  .pass__stamp text { fill: currentColor; font-family: var(--font-mono); text-anchor: middle; }
+  .pass__stamp-ring { font-size: 7.6px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .pass__stamp-no { font-size: 26px; font-weight: 500; letter-spacing: 0.02em; }
+  .pass__stamp-date { font-size: 7.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .pass__stub {
+    position: relative; display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; padding: 1rem clamp(1.4rem, 2.4vw, 1.9rem) 1.1rem;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(255, 180, 84, 0.3); border-top: 0; border-radius: 0 0 14px 14px;
+    background: linear-gradient(180deg, #0c1027, #0a0d22);
+    mask: radial-gradient(circle at 0 0, #0000 9px, #000 9.5px) left / 51% 100% no-repeat,
+          radial-gradient(circle at 100% 0, #0000 9px, #000 9.5px) right / 51% 100% no-repeat;
+  }
+  /* the perforation, and the flight filling it in */
+  .pass__stub::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; border-top: 1px dashed rgba(255, 180, 84, 0.34); }
+  /* (kept inside the stub: its notch mask clips anything above its top edge) */
+  .pass__flight { position: absolute; left: 14px; right: 14px; top: 0; height: 1px; opacity: 0; transition: opacity 0.3s; }
+  .pass__flight-fill { position: absolute; left: 0; top: 0; height: 1.5px; width: calc(var(--flight, 0) * 100%); background: var(--accent); box-shadow: 0 0 8px rgba(255, 180, 84, 0.8); }
+  .pass__flight svg { position: absolute; top: 2px; left: calc(var(--flight, 0) * 100% - 6px); width: 12px; height: 12px; color: var(--accent); rotate: 90deg; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.8)); }
+  .pass.is-flying .pass__flight { opacity: 1; }
+  .pass__leg { display: inline-flex; gap: 0.6em; color: var(--ink); }
+  .pass__sheen {
+    position: absolute; inset: 0; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+    background: radial-gradient(28rem circle at var(--mx) var(--my), rgba(255, 238, 205, 0.1), transparent 55%);
+    mix-blend-mode: screen;
+  }
+  html.has-cursor .pass.is-current .pass__face:hover .pass__sheen { opacity: 1; }
+  .pass.is-tba .pass__body, .pass.is-tba .pass__stub { border-style: dashed; }
+
+  /* rich layout */
+  .jr.is-deck .jr__track { height: calc(var(--units, 12) * var(--unit) + 100svh); padding: 0; --unit: 62svh; }
+  .jr.is-deck .jr__snap { display: block; position: absolute; left: 0; width: 1px; height: 1px; scroll-snap-align: center; pointer-events: none; }
+  .jr.is-deck .jr__stage {
+    position: sticky; top: 0; height: 100svh; display: grid; align-items: center;
+    grid-template-columns: 14.5rem minmax(19rem, 25rem) 1fr; column-gap: clamp(1.5rem, 3vw, 3rem);
+    padding: 5.5rem var(--gutter) 2.5rem;
+  }
+  .jr.is-deck .jr-deck { display: block; position: relative; align-self: stretch; max-width: none; }
+  .jr.is-deck .jr-deck { perspective: 1600px; }
+  .jr.is-deck .pass { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; visibility: hidden; opacity: 0; }
+  .jr.is-deck .pass.is-current { visibility: visible; opacity: 1; }
+
+  /* the rail: a vertical flight path; legs bow out by their arc heights */
+  .jr.is-deck .jr-rail { display: block; position: relative; align-self: center; height: min(72svh, 42rem); pointer-events: auto; }
+  .jr-rail__path { position: absolute; left: 0; top: 0; width: 2.5rem; height: 100%; overflow: visible; }
+  .jr-rail__route { fill: none; stroke: rgba(200, 208, 255, 0.28); stroke-width: 1; }
+  .jr-rail__flown { fill: none; stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.7)); }
+  .jr-rail__stops { position: absolute; inset: 0; }
+  .jr-rail__stops li { position: absolute; left: 0; right: 0; top: var(--at); translate: 0 -50%; }
+  .jr-rail__stop {
+    display: flex; align-items: baseline; gap: 0.6rem; width: 100%; padding: 0.2rem 0 0.2rem 1.875rem; text-align: left;
+    font: 500 0.6875rem/1.2 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(226, 230, 255, 0.66);
+    transition: color 0.3s;
+  }
+  .jr-rail__stop:hover, .jr-rail__stop:focus-visible { color: var(--ink); }
+  .jr-rail__stop.is-past { color: rgba(226, 230, 255, 0.8); }
+  .jr-rail__stop.is-current { color: var(--accent); }
+  .jr-rail__node {
+    position: absolute; left: 1.875rem; top: 50%; width: 7px; height: 7px; translate: -50% -50%; border-radius: 50%;
+    background: var(--night); border: 1px solid rgba(226, 230, 255, 0.55); transition: background-color 0.3s, border-color 0.3s, scale 0.4s var(--ease);
+  }
+  .jr-rail__stop.is-past .jr-rail__node { background: var(--accent); border-color: var(--accent); }
+  .jr-rail__stop.is-current .jr-rail__node { background: var(--accent); border-color: var(--accent); scale: 1.5; box-shadow: 0 0 0 4px rgba(255, 180, 84, 0.18), 0 0 12px rgba(255, 180, 84, 0.8); }
+  .jr-rail__name { margin-left: 0.7rem; white-space: nowrap; }
+  .jr-rail__date { color: rgba(226, 230, 255, 0.5); white-space: nowrap; display: none; }
+  .jr-rail__stop.is-current .jr-rail__date { display: inline; color: rgba(255, 180, 84, 0.75); }
+  .jr-rail__plane {
+    position: absolute; left: calc(var(--px, 0.75) * 2.5rem); top: var(--py, 0%); z-index: 1; display: flex; align-items: center; gap: 0.5rem;
+    translate: -8px -8px; color: var(--accent); pointer-events: none;
+  }
+  .jr-rail__plane svg { width: 16px; height: 16px; rotate: calc(var(--rot, 1.5708rad) - 1.5708rad + 180deg); filter: drop-shadow(0 0 6px rgba(255, 180, 84, 0.8)); }
+  .jr-rail__alt { position: absolute; right: calc(100% + 0.4rem); color: rgba(255, 180, 84, 0.8); font-size: 0.5625rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* compact: globe up top, the rail as a strip under the nav, the pass as a bottom sheet */
+  @media (max-width: 899px), (orientation: portrait) and (max-width: 1100px) {
+    .jr.is-deck .jr__track { --unit: 50svh; }
+    .jr.is-deck .jr__stage { display: block; padding: 0; }
+    .jr.is-deck .jr-rail { position: absolute; left: var(--gutter); right: var(--gutter); top: 4.9rem; height: 1.5rem; }
+    .jr.is-deck .jr-rail__path { display: none; }
+    .jr.is-deck .jr-rail__stops::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(200, 208, 255, 0.28); }
+    .jr.is-deck .jr-rail__stops li { left: var(--at); right: auto; top: 50%; translate: -50% -50%; }
+    .jr.is-deck .jr-rail__stop { padding: 0.55rem; width: auto; }
+    .jr.is-deck .jr-rail__node { left: 50%; }
+    .jr.is-deck .jr-rail__name, .jr.is-deck .jr-rail__date { display: none; }
+    .jr.is-deck .jr-rail__plane { display: none; }
+    .jr.is-deck .jr-deck { position: absolute; left: var(--gutter); right: var(--gutter); bottom: max(1rem, env(safe-area-inset-bottom)); height: auto; }
+    .jr.is-deck .pass { top: auto; bottom: 0; translate: none; }
+    .jr.is-deck .pass__name { font-size: clamp(2.1rem, 9vw, 2.9rem); margin-top: 0.8rem; }
+    .jr.is-deck .pass__note { margin-top: 0.8rem; font-size: 1rem; }
+    .jr.is-deck .pass__photo img { aspect-ratio: 16 / 7; }
+    .jr.is-deck .pass__stub { padding-top: 0.8rem; padding-bottom: 0.9rem; }
+    .jr.is-deck .pass__stamp { width: 5rem; height: 5rem; top: -0.7rem; right: -0.4rem; }
+    .jr.is-deck .pass__head { padding-right: 4.4rem; }
+  }
+  @media (pointer: coarse) { html:has(.jr.is-deck) { scroll-snap-type: y proximity; } }
+
+  /* ---- logbook: the unrolled map is its backdrop ---- */
+  .lb { position: relative; padding: clamp(7rem, 22vh, 12rem) var(--gutter) clamp(5rem, 12vh, 8rem); background: radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(4, 5, 13, 0.55) 100%); }
+  .lb__title { font: 300 clamp(2.5rem, 6vw, 5.5rem)/1 var(--font-display); letter-spacing: -0.03em; max-width: 16ch; text-shadow: 0 2px 30px rgba(4, 5, 13, 0.9); }
+  .lb-sweep {
+    background: linear-gradient(90deg, var(--accent) calc(var(--sweep) - 16%), #fff2da calc(var(--sweep) - 4%), var(--accent) var(--sweep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+  }
+  html.js:not(.reduce-motion) .lb__head:not(.is-in) .lb-sweep { --sweep: -18%; }
+  html.js:not(.reduce-motion) .lb__head.is-in .lb-sweep { animation: sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) 0.45s backwards; }
+  .lb__grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: minmax(13.5rem, auto); gap: 1rem; margin-top: clamp(3rem, 8vh, 5rem); perspective: 1400px; }
+
+  /* tiles: a pointer sheen and a border that glows toward the cursor */
+  .tile {
+    position: relative; isolation: isolate; border: 1px solid var(--faint); border-radius: 12px; background: rgba(8, 10, 26, 0.68);
+    --mx: 50%; --my: 50%;
+  }
+  .tile::before, .tile::after { content: ""; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  .tile::before { inset: 0; z-index: 3; background: radial-gradient(34rem circle at var(--mx) var(--my), rgba(255, 236, 200, 0.07), transparent 50%); }
+  .tile::after {
+    inset: -1px; z-index: 4; padding: 1px; background: radial-gradient(22rem circle at var(--mx) var(--my), rgba(255, 180, 84, 0.9), transparent 45%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  html.has-cursor .tile:hover::before, html.has-cursor .tile:hover::after, .tile:focus-within::after { opacity: 1; }
+  .lb-panel { grid-column: span 4; padding: 1.75rem; }
+  .lb__h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.2rem 1rem; font: 400 1.75rem var(--font-display); margin-bottom: 1.25rem; }
+  .lb__h .at-mono { color: var(--muted); text-align: right; }
+
+  /* the route: a scrollable itinerary whose line fills as you read it; hovering a place lights it on the map */
+  .lb-route { grid-column: span 5; grid-row: span 2; display: flex; flex-direction: column; padding: 1.75rem 1.75rem 0.5rem; min-height: 0; }
+  .lb-route__scroll {
+    position: relative; flex: 1; min-height: 0; max-height: 30rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    padding: 0.4rem 0 3rem 1.6rem; outline-offset: 4px; border-radius: 4px;
+    --ft: 0rem; --fb: 3rem;
+    -webkit-mask-image: linear-gradient(transparent, #000 var(--ft), #000 calc(100% - var(--fb)), transparent);
+    mask-image: linear-gradient(transparent, #000 var(--ft), #000 calc(100% - var(--fb)), transparent);
+    transition: --ft 0.3s, --fb 0.3s;
+  }
+  .lb-route__scroll::-webkit-scrollbar { display: none; }
+  .lb-route__track { position: absolute; left: 4px; top: 0.7rem; width: 1px; height: calc(var(--list-h, 100%) - 1.4rem); background: rgba(200, 208, 255, 0.2); }
+  .lb-route__fill { position: absolute; left: 0; top: 0; width: 1px; height: calc(var(--fill, 0) * 100%); background: linear-gradient(var(--accent), var(--land-s)); box-shadow: 0 0 8px rgba(255, 180, 84, 0.6); }
+  .lb-route__list { display: grid; gap: 1.15rem; }
+  .lb-route__list li { position: relative; display: grid; gap: 0.1rem; padding: 0.15rem 0.5rem; margin-left: -0.5rem; border-radius: 6px; transition: background-color 0.3s; }
+  .lb-route__list li::before { content: ""; position: absolute; left: calc(-1.6rem + 1px + 0.5rem); top: 0.55rem; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(255, 180, 84, 0.7); transition: scale 0.3s var(--ease); }
+  .lb-route__list li.is-home::before { background: var(--land-n); box-shadow: 0 0 10px rgba(111, 242, 224, 0.7); }
+  .lb-route__list li.is-tba { opacity: 0.45; }
+  .lb-route__list li:hover { background: rgba(255, 180, 84, 0.07); }
+  .lb-route__list li:hover::before { scale: 1.6; }
+  .lb-route__list .at-mono { color: var(--accent); }
+  .lb-route__list strong { font: 400 1.35rem/1.2 var(--font-display); }
+  .lb-route__list span:last-child { color: var(--muted); font-size: 0.875rem; }
+
+  /* doorways to the other two pages */
+  .lb-door {
+    grid-column: span 7; overflow: hidden; display: grid; align-content: end; gap: 0.5rem;
+    min-height: 13.5rem; padding: 1.5rem 1.75rem; text-decoration: none; transition: border-color 0.4s;
+  }
+  .lb-door > strong, .lb-door > .at-mono, .lb-door__desc { position: relative; z-index: 2; }
+  .lb-door strong { font: 300 clamp(2rem, 3.4vw, 3rem)/0.95 var(--font-display); letter-spacing: -0.03em; }
+  .lb-door strong em { color: var(--accent); }
+  .lb-door__desc { color: var(--muted); max-width: 30rem; padding-right: 7rem; }
+  .lb-door .at-mono { color: var(--land-n); }
+  .lb-door:hover { border-color: rgba(255, 180, 84, 0.5); }
+  /* the magnetic Enter lives in the top-right corner: it follows the cursor a little, never onto the text */
+  .lb-door__enter {
+    position: absolute; top: 1.1rem; right: 1.1rem; z-index: 5; display: grid; place-items: center; gap: 0.1rem; width: 5.2rem; height: 5.2rem;
+    border: 1px solid rgba(255, 180, 84, 0.5); border-radius: 50%; color: var(--accent); background: rgba(4, 5, 13, 0.55);
+    font: 500 0.625rem/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase;
+    transition: background-color 0.35s, color 0.35s, border-color 0.35s;
+  }
+  .lb-door__arrow { font-size: 1.1rem; letter-spacing: 0; transition: transform 0.45s var(--ease); }
+  .lb-door:hover .lb-door__enter, .lb-door:focus-visible .lb-door__enter { background: var(--accent); color: var(--night); border-color: var(--accent); }
+  .lb-door:hover .lb-door__arrow { transform: translateX(4px); }
+  .lb-door--career { background: radial-gradient(80% 120% at 100% 0%, rgba(77, 124, 255, 0.28), transparent 60%), rgba(8, 10, 26, 0.7); }
+  .lb-door__dots {
+    position: absolute; inset: 0; z-index: 0; opacity: 0.45; pointer-events: none;
+    background-image: radial-gradient(rgba(200, 208, 255, 0.35) 1px, transparent 1.5px); background-size: 14px 14px;
+    mask-image: linear-gradient(115deg, transparent 30%, #000);
+  }
+  /* the git log types itself behind the card on hover */
+  .lb-door__log {
+    position: absolute; left: 1.75rem; right: 8rem; top: 1.3rem; z-index: 1; margin: 0; white-space: pre; overflow: hidden;
+    font: 400 0.75rem/1.7 var(--font-mono); color: rgba(111, 242, 224, 0.28); opacity: 0; transition: opacity 0.5s;
+  }
+  .lb-door--career:hover .lb-door__log, .lb-door--career:focus-visible .lb-door__log { opacity: 1; }
+  .lb-door__log b { color: rgba(255, 180, 84, 0.45); font-weight: 400; }
+  .lb-door__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .lb-door__media img, .lb-door__media canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .lb-door__media img { filter: saturate(0.9) brightness(0.55); transform: scale(1.02); transition: transform 12s linear, filter 0.6s; }
+  .lb-door--photo:hover .lb-door__media img { transform: scale(1.1); filter: saturate(1) brightness(0.65); }
+  .lb-door__media canvas { opacity: 0; transition: opacity 0.5s; }
+  @media (prefers-reduced-motion: reduce) {
+    .lb-door__media img, .lb-door--photo:hover .lb-door__media img { transform: scale(1.02); transition: filter 0.6s; }
+    .lb-door:hover .lb-door__arrow { transform: none; }
+  }
+  .lb-door__media.is-gl canvas { opacity: 1; }
+  .lb-door__shade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to top, rgba(4, 5, 13, 0.9), transparent 70%); pointer-events: none; }
+  @media (max-width: 1000px) {
+    .lb-panel, .lb-route, .lb-door { grid-column: 1 / -1; grid-row: auto; }
+    .lb-route__scroll { max-height: 26rem; }
+  }
+  @media (max-width: 600px) {
+    .lb-door__desc { padding-right: 0; }
+    .lb-door { padding-top: 6.5rem; }
+    .lb-door__log { right: 1.5rem; top: 6.4rem; }
+  }
+
+  .at-bullets { display: grid; gap: 0.75rem; color: var(--muted); }
+  .at-bullets li { padding-left: 1.1rem; position: relative; }
+  .at-bullets li::before { content: "→"; position: absolute; left: 0; color: var(--accent); }
+  .at-post { display: grid; gap: 0.25rem; text-decoration: none; }
+  .at-post strong { font: 400 1.25rem/1.2 var(--font-display); transition: color 0.3s; }
+  .at-post span { color: var(--muted); font-size: 0.875rem; }
+  .at-post:hover strong { color: var(--accent); }
+  .at-interests { display: grid; gap: 0.75rem; }
+  .at-interests dt { font-weight: 600; }
+  .at-interests dd { color: var(--muted); font-size: 0.875rem; }
+
+  /* ---- live: concerts as ticket stubs ---- */
+  .tk { position: relative; padding: clamp(5rem, 12vh, 8rem) var(--gutter) clamp(3rem, 8vh, 5rem); background: linear-gradient(transparent, rgba(4, 5, 13, 0.82) 22rem); }
+  .tk__titlewrap { position: relative; isolation: isolate; }
+  .at-live__title { font: 300 clamp(2.5rem, 6vw, 5.5rem)/1 var(--font-display); letter-spacing: -0.03em; max-width: 16ch; }
+  .at-live__title em { color: var(--pink); }
+  .at-live__count { margin-top: 1.5rem; color: var(--muted); }
+  /* a decorative waveform breathing behind the headline (no audio) */
+  .tk__wave { position: absolute; left: -4%; top: 50%; z-index: -1; width: 108%; height: 7rem; translate: 0 -50%; overflow: visible; pointer-events: none; }
+  .tk__wave path { fill: none; stroke: var(--pink); stroke-width: 1.2; opacity: 0.32; vector-effect: non-scaling-stroke; stroke-dasharray: 3 6; transform-origin: 50% 50%; animation: wave-run 7s linear infinite, wave-beat 1.7s ease-in-out infinite; }
+  @keyframes wave-run { to { stroke-dashoffset: -180; } }
+  @keyframes wave-beat { 0%, 100% { transform: scaleY(0.65); } 50% { transform: scaleY(1.15); } }
+  .tk:not(.is-on) .tk__wave path { animation-play-state: paused; } /* runs only while its headline is on screen */
+
+  /* three across; the last row's stubs widen so there is never an empty slot (5 → 3 + 2) */
+  .tk__grid { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-top: clamp(2.5rem, 6vh, 4rem); }
+  .tk__slot { grid-column: span var(--span, 2); perspective: 1400px; }
+  .ticket { position: relative; display: block; width: 100%; height: 10.5rem; text-align: left; border-radius: 10px; --mx: 50%; --my: 50%; --ang: 0; }
+  .ticket__inner { position: absolute; inset: 0; transition: transform 0.8s var(--ease); }
+  .ticket__face { position: absolute; inset: 0; border-radius: 10px; }
+  /* The flip's 3D, and the GPU layers it costs on every frame, only exists once a ticket is in
+     play: tickets.ts adds .is-3d on first hover, touch or focus. Until then there is no back. */
+  .ticket.is-3d .ticket__inner { transform-style: preserve-3d; }
+  .ticket.is-3d .ticket__face { backface-visibility: hidden; }
+  .ticket[aria-pressed="true"] .ticket__inner { transform: rotateY(180deg); }
+  .ticket__front {
+    display: grid; grid-template-columns: 1fr 7.5rem; overflow: hidden; border: 1px solid var(--faint);
+    background: radial-gradient(120% 140% at 0% 0%, rgba(255, 111, 145, 0.18), transparent 55%), rgba(10, 12, 31, 0.9);
+    /* the two half-circle bites where the stub tears off */
+    --notch: 0.7rem;
+    mask: radial-gradient(circle at calc(100% - 7.5rem) 0, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat,
+          radial-gradient(circle at calc(100% - 7.5rem) 100%, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat;
+    transition: border-color 0.4s;
+  }
+  /* paper grain */
+  .ticket__front::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.18; mix-blend-mode: overlay;
+    background: var(--grain, none) 0 0 / 128px 128px; /* src/scripts/atlas/ui/grain.ts, set as the tickets arrive */
+  }
+  .ticket:hover .ticket__front, .ticket:focus-visible .ticket__front { border-color: rgba(255, 111, 145, 0.7); }
+  .ticket__main { position: relative; z-index: 1; display: grid; align-content: space-between; gap: 0.6rem; padding: 1.25rem 1.4rem; }
+  .ticket__admit { color: var(--pink); }
+  .ticket__artist { font: 400 clamp(1.5rem, 2.4vw, 2.05rem)/1.05 var(--font-display); letter-spacing: -0.02em; color: var(--ink); }
+  .ticket__where { color: var(--muted); font-size: 0.875rem; }
+  /* the perforated stub: tears a little on its hinge when you hover */
+  .ticket__stub {
+    position: relative; z-index: 1; display: grid; place-items: center; padding: 1rem; border-left: 2px dashed var(--faint);
+    transform-origin: 0 0; transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .ticket__stub time { color: var(--ink); writing-mode: vertical-rl; rotate: 180deg; font-size: 0.75rem; }
+  html.has-cursor .ticket:hover .ticket__stub { transform: rotate(4deg) translateX(2px); }
+  /* holographic foil: hue follows the pointer's angle across the ticket, strength follows the tilt */
+  .ticket__foil {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.1; mix-blend-mode: color-dodge; transition: opacity 0.4s;
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.22) calc(var(--mx) - 2%), transparent calc(var(--mx) + 12%)),
+      conic-gradient(from calc(var(--ang) * 1deg) at var(--mx) var(--my), #ff6f91, #ffd36f, #6ff2e0, #9d7bff, #ff6f91);
+  }
+  .ticket:hover .ticket__foil { opacity: 0.32; }
+  .ticket__back {
+    transform: rotateY(180deg); display: none; grid-template-rows: 1fr auto auto; gap: 0.4rem; padding: 1rem 1.3rem;
+    border: 1px solid rgba(255, 111, 145, 0.55); background: linear-gradient(160deg, #1b1330, #0d0b1f);
+  }
+  .ticket.is-3d .ticket__back { display: grid; }
+  .ticket__back-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; align-content: start; color: var(--muted); font-size: 0.625rem; }
+  .ticket__back-grid span:nth-child(even) { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ticket__barcode { width: 100%; height: 2.2rem; fill: var(--ink); }
+  .ticket__code { color: var(--pink); font-size: 0.625rem; text-align: center; letter-spacing: 0.3em; }
+  @media (max-width: 1000px) {
+    .tk__grid { grid-template-columns: repeat(2, 1fr); }
+    .tk__slot { grid-column: span 1; }
+    .tk__slot:last-child:nth-child(odd) { grid-column: span 2; }
+  }
+  @media (max-width: 640px) {
+    .tk__grid { grid-template-columns: 1fr; }
+    .tk__slot, .tk__slot:last-child:nth-child(odd) { grid-column: auto; }
+    .ticket__front { grid-template-columns: 1fr 5.5rem; mask: radial-gradient(circle at calc(100% - 5.5rem) 0, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat, radial-gradient(circle at calc(100% - 5.5rem) 100%, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tk__wave path { animation: none; }
+    /* the flip becomes a crossfade: no rotation, the faces trade places */
+    .ticket__inner, .ticket[aria-pressed="true"] .ticket__inner { transition: none; transform: none; }
+    .ticket__back { transform: none; }
+    .ticket__face { transition: opacity 0.2s; }
+    .ticket.is-3d .ticket__back { opacity: 0; }
+    .ticket[aria-pressed="true"] .ticket__front { opacity: 0; }
+    .ticket[aria-pressed="true"] .ticket__back { opacity: 1; }
+  }
+
+  /* ---- footer ---- */
+  .at-footer { position: relative; padding: clamp(6rem, 16vh, 10rem) var(--gutter) 2rem; background: var(--night); }
+  .at-footer__cta { display: block; font: 300 clamp(4.5rem, 16vw, 17rem)/0.88 var(--font-display); letter-spacing: -0.045em; text-decoration: none; }
+  .at-footer__cta em { color: var(--accent); }
+  /* the last beat: a dashed flight path from the last stop into the "?" (src/scripts/atlas/ui/footer.ts);
+     the footer's own type stays above it */
+  .at-footer > :not(.ft-arc) { position: relative; z-index: 1; }
+  .ft-arc { position: absolute; left: 0; width: 100%; z-index: 0; pointer-events: none; overflow: visible; }
+  .ft-arc__path { fill: none; stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 2 7; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 180, 84, 0.7)); }
+  .ft-arc__draw { fill: none; stroke: #fff; stroke-width: 14; }
+  .ft-arc__head { fill: var(--amber); filter: drop-shadow(0 0 6px rgba(255, 180, 84, 0.95)); opacity: 0; transition: opacity 0.3s; }
+  .at-footer.is-flying .ft-arc__head { opacity: 1; }
+  .ft-arc__from { fill: var(--amber); opacity: 0; transition: opacity 0.5s; }
+  .ft-arc__from text { fill: var(--muted); font: 500 10px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; }
+  .ft-arc__ring { fill: none; stroke: var(--amber); stroke-width: 1; opacity: 0.5; }
+  .at-footer.is-leaving .ft-arc__from { opacity: 1; }
+  /* the "?" catches the light as the path lands (a filter, so the reveal's mask doesn't clip it) */
+  .ft-q { transition: filter 0.8s; }
+  .at-footer.is-arrived .ft-q { filter: drop-shadow(0 0 22px rgba(255, 180, 84, 0.6)); }
+  @media (prefers-reduced-motion: reduce) { .ft-arc__from, .ft-arc__head, .ft-q { transition: none; } }
+</style>

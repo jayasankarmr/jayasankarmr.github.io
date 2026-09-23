@@ -1,0 +1,49 @@
+/* Shared reset + primitives. Each concept layers its own tokens on top. */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { min-height: 100svh; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+ul[role="list"], ol[role="list"] { list-style: none; padding: 0; }
+
+/* native cross-document view transitions — /photography/ opts in too */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+/* the home page's doorways morph into the pages they open (career sheet, photography hero) */
+::view-transition-group(career-sheet), ::view-transition-group(photo-hero) { animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+::view-transition-old(career-sheet), ::view-transition-new(career-sheet), ::view-transition-old(photo-hero), ::view-transition-new(photo-hero) { animation-duration: 0.7s; height: 100%; object-fit: cover; }
+
+/* Lenis */
+html.lenis, html.lenis body { height: auto; }
+.lenis:not(.lenis-autoToggle).lenis-stopped { overflow: clip; }
+.lenis [data-lenis-prevent] { overscroll-behavior: contain; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: fixed; top: 1rem; left: 1rem; z-index: 1000;
+  padding: 0.6rem 1rem; background: var(--skip-bg, #000); color: var(--skip-ink, #fff);
+  transform: translateY(-200%); transition: transform 0.2s;
+}
+.skip-link:focus { transform: none; }
+
+:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 3px; }
+
+/* split-text spans (scripts/motion/split.ts) */
+.split-word { display: inline-block; white-space: nowrap; }
+/* the mask only has to hide what is still below it; padding (cancelled by margins, so layout is
+   unchanged) leaves room for italic overhang and tall ascenders on the other three sides */
+.split-mask { display: inline-block; overflow: clip; vertical-align: top; padding: 0.14em 0.14em 0.08em; margin: -0.14em -0.14em -0.08em; }
+.split-char, .split-inner { display: inline-block; will-change: transform; }
+
+/* no-JS / reduced-motion: anything waiting on a reveal is simply visible */
+html:not(.js) [data-reveal], html.reduce-motion [data-reveal] { opacity: 1 !important; transform: none !important; }
+
+/* intro loader plays once per visit (Base.astro sets .intro-seen) */
+html.intro-seen [data-loader] { display: none !important; }
