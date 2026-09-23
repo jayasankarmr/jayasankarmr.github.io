@@ -9,6 +9,10 @@ export type Concert = {
   when: string;
   /** a path under /photography/images once a frame is picked */
   photo?: string;
+  /** venue for the back of the ticket; the back falls back to `event`, then `city` */
+  venue?: string;
+  /** one line for the back of the ticket (who you went with, the song that did it) */
+  note?: string;
 };
 
 export const concerts: Concert[] = [

@@ -1,11 +1,15 @@
 ---
+import { Font } from "astro:assets";
+import type { CssVariable, FontPreloadFilter } from "astro:assets";
 import "../styles/base.css";
 
 interface Props {
   title: string;
   description?: string;
-  /** Google Fonts css2 query, e.g. "family=Inter:wght@400;500" */
+  /** Google Fonts css2 query, e.g. "family=Inter:wght@400;500" (pages not yet self-hosted) */
   fonts?: string;
+  /** self-hosted families from astro.config `fonts`, beyond the chrome's Inter + Instrument Serif */
+  selfHosted?: { cssVariable: CssVariable; preload?: FontPreloadFilter }[];
   bodyClass?: string;
   image?: string;
   noindex?: boolean;
@@ -15,6 +19,7 @@ const {
   title,
   description = "Jayasankar M R — engineer and photographer from Kerala. Career, projects, photography, travel and writing.",
   fonts,
+  selfHosted = [],
   bodyClass,
   image = "/photography/images/hero.jpg",
   noindex = false,
@@ -45,12 +50,15 @@ const ogImage = new URL(image, Astro.site);
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- shared header/footer (public/shared/) — same files the photography page loads -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500&family=Instrument+Serif:ital@0;1&display=swap" />
+    <!-- shared header/footer (public/shared/) — same files the photography page loads; its
+         fonts are self-hosted here (chrome.css falls back to Google's on /photography/) -->
+    <Font cssVariable="--font-inter" />
+    <Font cssVariable="--font-instrument" />
+    {selfHosted.map((f) => <Font cssVariable={f.cssVariable} preload={f.preload} />)}
     <link rel="stylesheet" href="/shared/chrome.css" />
     <script is:inline src="/shared/chrome.js" defer></script>
+    {fonts && <link rel="preconnect" href="https://fonts.googleapis.com" />}
+    {fonts && <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />}
     {fonts && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?${fonts}&display=swap`} />}
     <script is:inline>
       document.documentElement.classList.add("js");

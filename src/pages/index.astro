@@ -22,7 +22,11 @@ const cities = new Set(concerts.map((c) => c.city)).size;
 ---
 <Base
   title="Jayasankar M R — engineer & photographer"
-  fonts="family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..600,50;1,9..144,300..600,50&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500"
+  selfHosted={[
+    { cssVariable: "--font-fraunces", preload: [{ style: "normal" }] },
+    { cssVariable: "--font-manrope" },
+    { cssVariable: "--font-plex-mono" },
+  ]}
   bodyClass="at"
 >
   <div class="at-loader" data-loader>
@@ -194,9 +198,9 @@ const cities = new Set(concerts.map((c) => c.city)).size;
     --land-n: #6ff2e0;
     --land-s: #9d7bff;
     --atmo: #4d7cff;
-    --font-display: "Fraunces", Georgia, serif;
-    --font-body: "Manrope", system-ui, sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    --font-display: var(--font-fraunces);
+    --font-body: var(--font-manrope);
+    --font-mono: var(--font-plex-mono);
     --gutter: clamp(1.25rem, 4vw, 3.5rem);
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
     --cursor-ink: var(--accent);

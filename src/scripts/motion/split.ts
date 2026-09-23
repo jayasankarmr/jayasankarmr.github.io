@@ -1,10 +1,14 @@
 // Minimal SplitText: wraps words (and optionally chars) in spans for staggered reveals.
-// The original string moves to aria-label so screen readers read it once, unbroken.
+// Screen readers get one unbroken, visually hidden copy of the text; the split spans are
+// aria-hidden. (aria-label would be prohibited on the spans and paragraphs this runs on.)
 export function split(el: HTMLElement, mode: "words" | "chars" = "words") {
   if (el.dataset.splitDone) return el.querySelectorAll<HTMLElement>(mode === "chars" ? ".split-char" : ".split-inner");
   const text = el.textContent ?? "";
-  el.setAttribute("aria-label", text.replace(/\s+/g, " ").trim());
   const frag = document.createDocumentFragment();
+  const sr = document.createElement("span");
+  sr.className = "sr-only";
+  sr.textContent = text.replace(/\s+/g, " ").trim();
+  frag.appendChild(sr);
   const walk = (node: Node, into: Node) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === Node.TEXT_NODE) {

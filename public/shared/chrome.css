@@ -16,8 +16,9 @@
   --chrome-accent: #c8b493;
   --chrome-h: 4.5rem;
   --chrome-gutter: clamp(1.25rem, 4vw, 3rem);
-  --chrome-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --chrome-serif: "Instrument Serif", Georgia, serif;
+  /* Astro pages self-host these (--font-inter / --font-instrument); /photography/ loads them from Google */
+  --chrome-sans: var(--font-inter, "Inter"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --chrome-serif: var(--font-instrument, "Instrument Serif"), Georgia, serif;
 }
 
 /* ---------- header ---------- */
@@ -60,6 +61,11 @@
 
 .site-nav__brand em { font-style: italic; color: var(--chrome-accent); }
 .site-nav__brand-short { display: none; }
+/* the brand's accessible name ("… — home"), visually hidden */
+.site-nav__sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
 .site-nav__links {
   display: flex;

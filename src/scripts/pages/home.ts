@@ -109,13 +109,23 @@ async function main() {
     onLeaveBack: () => activate(-1),
   });
 
-  // globe steps back once the notebook takes over
+  // globe steps back once the notebook takes over. The trigger runs to the end of the page, so
+  // a jump (anchor, End key, fast flick) can't skip past it; once faded, the loop stops drawing.
+  // (progress, not isActive: at the very bottom a trigger ending at "max" counts as left)
+  let away = false, awayTimer = 0;
+  const setAway = (v: boolean) => {
+    if (v === away) return;
+    away = v;
+    canvas.classList.toggle("is-away", v);
+    labelsRoot.classList.toggle("is-away", v);
+    clearTimeout(awayTimer);
+    if (v) awayTimer = window.setTimeout(() => globe.setPaused(true), 850); // after the 0.8s fade
+    else globe.setPaused(false);
+  };
   ScrollTrigger.create({
-    trigger: "#notebook", start: "top 45%",
-    onToggle: (st) => {
-      canvas.classList.toggle("is-away", st.isActive || st.progress > 0);
-      labelsRoot.classList.toggle("is-away", st.isActive || st.progress > 0);
-    },
+    trigger: "#notebook", start: "top 45%", end: "max",
+    onUpdate: (st) => setAway(st.progress > 0),
+    onRefresh: (st) => setAway(st.progress > 0),
   });
 
   initReveals();

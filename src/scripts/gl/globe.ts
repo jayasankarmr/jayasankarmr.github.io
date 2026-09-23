@@ -219,12 +219,16 @@ export async function initGlobe(canvas: HTMLCanvasElement, places: GlobePlace[],
 
   let onFrame: ((pts: ReturnType<typeof project>) => void) | undefined;
   let visible = true;
+  // a fixed canvas is always "intersecting", so the page also pauses the loop explicitly
+  let paused = false;
   onVisibility(canvas, (v) => (visible = v));
-  const clock = new THREE.Clock();
-  renderer.setAnimationLoop(() => {
-    if (!visible) return;
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime;
+  const timer = new THREE.Timer();
+  timer.connect(document);
+  renderer.setAnimationLoop((now) => {
+    if (!visible || paused) return;
+    timer.update(now);
+    const dt = Math.min(timer.getDelta(), 0.05);
+    const t = timer.getElapsed();
     mMat.uniforms.uTime.value = t;
     if (!dragging) { state.dragX += vx; vx *= 0.94; vy *= 0.94; state.dragY *= 0.97; }
     state.ry += dt * 0.06 * state.spin;
@@ -262,6 +266,8 @@ export async function initGlobe(canvas: HTMLCanvasElement, places: GlobePlace[],
       gsap.to(state, { rx: f.rx, ry, zoom, spin: 0, duration: 1.8, ease: "power3.inOut", overwrite: "auto" });
     },
     layout(x: number, y: number) { gsap.to(state, { x, y, duration: 1.2, ease: "power3.inOut" }); },
+    /** Stops drawing while the globe is off-stage (behind the logbook and below). */
+    setPaused(p: boolean) { paused = p; },
     setLayoutNow(x: number, y: number) { state.x = x; state.y = y; },
   };
 }

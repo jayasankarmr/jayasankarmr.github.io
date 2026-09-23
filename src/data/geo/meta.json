@@ -1,0 +1,20 @@
+{
+  "world": {
+    "west": -180,
+    "north": 90,
+    "res": 0.25,
+    "width": 1440,
+    "height": 720
+  },
+  "region": {
+    "west": 68,
+    "north": 33,
+    "res": 0.025,
+    "width": 1400,
+    "height": 1120
+  },
+  "sources": {
+    "land": "world-atlas 2.0.2 (Natural Earth land 50m / 10m)",
+    "naturalEarth": "nvkelso/natural-earth-vector@ca96624a56bd078437bca8184e78163e5039ad19: ne_10m_lakes, ne_10m_rivers_lake_centerlines, ne_10m_populated_places_simple"
+  }
+}

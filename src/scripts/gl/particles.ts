@@ -173,11 +173,13 @@ export async function initParticleName(canvas: HTMLCanvasElement, opts: { ink: s
   const state = { intro: 1, scroll: 0 };
   let visible = true;
   onVisibility(canvas, (v) => (visible = v));
-  const clock = new THREE.Clock();
-  renderer.setAnimationLoop(() => {
+  const timer = new THREE.Timer();
+  timer.connect(document);
+  renderer.setAnimationLoop((now) => {
     if (!visible) return;
+    timer.update(now);
     const u = mat.uniforms;
-    u.uTime.value = clock.getElapsedTime();
+    u.uTime.value = timer.getElapsed();
     u.uMouse.value.lerp(target, 0.12);
     u.uMouseStrength.value += (strength - u.uMouseStrength.value) * 0.06;
     u.uScatter.value = Math.max(state.intro, state.scroll);

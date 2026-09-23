@@ -12,9 +12,10 @@ const { current, contact = "#contact" } = Astro.props;
 const pad = (n: number) => String(n).padStart(2, "0");
 ---
 <header class="site-nav" data-site-nav>
-  <a class="site-nav__brand" href="/" aria-label="Jayasankar M R — home">
-    <span class="site-nav__brand-full">Jayasankar <em>M R</em></span>
+  <a class="site-nav__brand" href="/">
+    <span class="site-nav__brand-full" aria-hidden="true">Jayasankar <em>M R</em></span>
     <span class="site-nav__brand-short" aria-hidden="true">J<em>MR</em></span>
+    <span class="site-nav__sr">Jayasankar M R — home</span>
   </a>
   <nav class="site-nav__links" aria-label="Site">
     {pages.map((p, i) => (
