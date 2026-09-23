@@ -15,7 +15,9 @@
 }
 
 /* ---------- media layer (moves slowest — see js/hero.js) ---------- */
+/* the home page's Photography doorway morphs into this (cross-document view transition) */
 .hero__media {
+  view-transition-name: photo-hero;
   position: absolute;
   z-index: 0;
   /* Oversized by 10% top and bottom. The downward parallax drift never pulls

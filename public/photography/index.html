@@ -40,6 +40,9 @@
   <script>
     (function () {
       if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // arriving through the home page's Photography doorway: the photo morphs in already
+      // developed, so skip the negative for this visit
+      try { if (sessionStorage.getItem("jmr-vt") === "photo") { sessionStorage.removeItem("jmr-vt"); return; } } catch (e) {}
       try { var c = document.createElement("canvas"); if (!c.getContext("webgl")) return; } catch (e) { return; }
       var h = document.documentElement;
       h.classList.add("hero-develop");

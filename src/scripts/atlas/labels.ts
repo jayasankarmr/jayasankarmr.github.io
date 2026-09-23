@@ -31,8 +31,10 @@ export class Labels {
   private placed: Rect[] = [];
   active = -1;
   reached = -1;
-  /** set false during the unroll / when the globe is away */
+  /** set false during the intro / when the globe is away */
   enabled = true;
+  /** the flat map: only the highlighted stop (route list hover) is named */
+  solo = false;
   reserved: () => Rect[] = () => [];
 
   constructor(private root: HTMLElement, private stops: LabelStop[], badgePool = 6) {
@@ -98,6 +100,7 @@ export class Labels {
         if (p.facing > 0.12 && p.x > 4 && p.x < w - 4 && p.y > 76 && p.y < h - 4) vis.push(i);
       });
     }
+    if (this.solo) vis.splice(0, vis.length, ...vis.filter((i) => i === this.active));
     vis.sort((a, b) => this.priority(b) - this.priority(a));
 
     // ---- clusters (the active stop always stands alone)

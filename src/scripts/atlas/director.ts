@@ -17,7 +17,17 @@ import type { TierConfig } from "./tier";
 
 export type AtlasPlace = { lat: number; lng: number; name: string; recurring?: boolean; home?: boolean; leg?: boolean };
 export type Projected = { x: number; y: number; facing: number };
-export type ScrollState = { heroOut: number; where: Where; inJourney: boolean };
+export type ScrollState = {
+  heroOut: number;
+  where: Where;
+  inJourney: boolean;
+  /** 0–1: the globe unrolling into the flat map after the last stop */
+  unroll?: number;
+  /** 0–1 through the logbook (the map drifts) */
+  ambient?: number;
+  /** 0–1: the ticket section taking over (the map dims further) */
+  dim?: number;
+};
 type Rect = { x: number; y: number; w: number; h: number };
 type FrameFn = (d: Director, dt: number) => void;
 
@@ -34,7 +44,9 @@ export class Director {
   /** the composed pose actually rendered this frame */
   readonly pose: Pose;
   readonly projected: Projected[];
-  mode: "hero" | "dive" | "journey" | "stop" = "hero";
+  mode: "hero" | "dive" | "journey" | "stop" | "unroll" | "map" = "hero";
+  /** a stop picked out on the map (route list hover), −1 for none */
+  highlight = -1;
   reducedMotion: boolean;
   /** scroll → pose (off in the reduced-motion list layout, which cuts with focus()) */
   scrollSource: (() => ScrollState) | null = null;
@@ -63,6 +75,10 @@ export class Director {
   private wave = { at: -1, x: 0, y: 0, z: 0 };
   private prevWhere: Where | null = null;
   private introState: { p: number; active: boolean; street: Pose } | null = null;
+  private mapPose: Pose = { lat: 22, lng: 82, dist: 3.7, tilt: 0, heading: 0, sx: 0, sy: 0 };
+  private endPose: Pose = { lat: 0, lng: 0, dist: 1, tilt: 0, heading: 0, sx: 0, sy: 0 };
+  private frameNo = 0;
+  private lowDpr = false;
   private introTl?: gsap.core.Timeline;
 
   constructor(readonly canvas: HTMLCanvasElement, readonly places: AtlasPlace[], readonly tier: TierConfig) {
@@ -335,6 +351,9 @@ export class Director {
       this.routes.state.forEach((r) => { r.progress = 0; r.heat = 1; });
       active = s.heroOut > 0.86 ? 0 : -1;
       this.prevWhere = null;
+    } else if ((s.unroll ?? 0) > 0) {
+      this.unrollFrame(s, fr);
+      return;
     } else {
       this.mode = "journey";
       const w = s.where;
@@ -351,6 +370,58 @@ export class Director {
     if (active !== this.active) this.setActive(active, active > this.active ? 1 : -1);
   }
 
+  /**
+   * "The world unrolls": from the last landing the camera lifts to face the map plane while every
+   * dot, arc and marker slides from the sphere onto it (the shaders' uMorph, nearest the map's
+   * centre first); the planet's body and atmosphere fall away, and the finished route network
+   * glows on the flat map, which then dims and drifts behind the logbook.
+   */
+  private unrollFrame(s: ScrollState, fr: Frame) {
+    const u = s.unroll ?? 0;
+    const last = this.places.length - 1;
+    landPose(this.places[last], stopHeading(this.legs, last), fr, this.endPose);
+    const { width: w, height: h } = this.stage;
+    const aspect = w / h;
+    // fit about half the world's width (India near the centre) on wide screens, the region on phones
+    this.mapPose.dist = (this.wide ? 3.3 : 1.9) / (2 * Math.tan((15 * Math.PI) / 180) * aspect);
+    const drift = (s.ambient ?? 0) - 0.5;
+    this.mapPose.lat = 22 + drift * -3 + Math.sin(this.time * 0.05) * 0.6;
+    this.mapPose.lng = 82 + drift * 6 + Math.cos(this.time * 0.04) * 0.9;
+    mixPose(this.endPose, this.mapPose, ease.camera(ramp(u, 0, 0.5)), this.base);
+    const W = this.world;
+    W.u.uMorph.value = smooth(ramp(u, 0.18, 0.86));
+    W.setBodyAlpha(1 - smooth(ramp(u, 0.2, 0.5)));
+    W.setAtmosphere(0.85 * (1 - smooth(ramp(u, 0.12, 0.42))));
+    // the map settles dim behind the logbook, and dimmer still once the tickets take over
+    W.u.uAlpha.value = (1 - 0.55 * smooth(ramp(u, 0.7, 1))) * (1 - 0.6 * (s.dim ?? 0));
+    // the whole network, cooling as it goes flat (overlapping additive arcs would blow out to white)
+    this.routes.state.forEach((r) => { r.progress = 1; r.heat = 0.3 + 0.7 * (1 - smooth(ramp(u, 0.05, 0.55))); });
+    this.routes.setAlpha((0.62 + 0.38 * (1 - smooth(ramp(u, 0.05, 0.4)))) * (1 - 0.5 * (s.dim ?? 0)));
+    this.mode = u >= 1 ? "map" : "unroll";
+    const a = this.highlight;
+    if (a !== this.active) this.setActive(a, 0);
+  }
+
+  /** The list layout (reduced motion): cut straight to the flat map behind the logbook, or back. */
+  setMapInstant(on: boolean) {
+    if (on) {
+      this.unrollFrame({ heroOut: 1, where: { i: this.places.length - 1, dwell: true, f: 0, active: -1 }, inJourney: false, unroll: 1, ambient: 0.5, dim: 0 }, this.journeyFrame());
+      this.mode = "map";
+    } else {
+      this.world.u.uMorph.value = 0;
+      this.world.setBodyAlpha(1);
+      this.world.u.uAlpha.value = 1;
+      this.routes.setAlpha(1);
+      this.world.setAtmosphere(0.85);
+      this.focus(this.places.length - 1);
+    }
+  }
+
+  /** Pick out a stop on the map (the route list's hover); −1 clears it. */
+  setHighlight(i: number) {
+    this.highlight = i;
+  }
+
   private tick = (_time: number, deltaMs: number) => {
     if (this.offstage) return;
     const dt = Math.min(deltaMs / 1000, 0.05);
@@ -360,6 +431,20 @@ export class Director {
 
     if (this.scrollSource) this.choreograph(dt, rich);
     else if (this.mode === "hero" && rich && !this.drag.active) this.base.lng -= this.spinRate * dt;
+    if (this.mode !== "unroll" && this.mode !== "map" && this.world.u.uMorph.value !== 0) {
+      this.world.u.uMorph.value = 0;
+      this.world.setBodyAlpha(1);
+      this.world.u.uAlpha.value = 1;
+      this.routes.setAlpha(1);
+      if (!this.introState?.active) this.world.setAtmosphere(0.85);
+    }
+    // the ambient map is a backdrop: half frame rate, one device pixel per CSS pixel at most
+    const lowDpr = this.mode === "map";
+    if (lowDpr !== this.lowDpr) {
+      this.lowDpr = lowDpr;
+      this.stage.setDprCap(lowDpr ? 1 : null);
+    }
+    if (this.mode === "map" && (this.frameNo++ & 1) && Math.abs(this.scrollVel) < 0.5) return;
     if (this.time - this.sunAt > 30) this.updateSun();
 
     // drag: inertia while free, a damped spring home once the page scrolls again

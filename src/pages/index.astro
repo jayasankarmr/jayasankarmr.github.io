@@ -10,6 +10,7 @@ import { site } from "../data/site";
 import { places, type Place } from "../data/travel";
 import { concerts } from "../data/concerts";
 import { now, interests } from "../data/now";
+import { career, commitHash, commitMessage } from "../data/career";
 import { buildLegs, formatKm } from "../scripts/atlas/journey";
 
 const posts = (await getCollection("writing", ({ data }) => !data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
@@ -22,6 +23,8 @@ const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocal
 const cities = new Set(concerts.map((c) => c.city)).size;
 const home = places[0];
 const chars = (t: string) => [...t];
+// the career card's background: the same log /career/ renders, one line per entry
+const gitLog = career.map((c, i) => `${commitHash(c)} ${i === 0 ? "(HEAD -> main) " : ""}${commitMessage(c)}`);
 
 // journey: legs, trips and distances come from the data (src/scripts/atlas/journey.ts)
 const legs = buildLegs(places);
@@ -209,49 +212,55 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
       </div>
     </section>
 
-    <!-- ============ NOTEBOOK ============ -->
-    <section class="at-notebook" id="notebook" aria-label="Route, pages, now, writing and interests">
-      <header class="at-notebook__head">
-        <p class="at-mono at-kicker" data-reveal>The logbook</p>
-        <h2 class="at-notebook__title" data-reveal="split">Everything I carry <em>between the stops.</em></h2>
+    <!-- ============ LOGBOOK ============ -->
+    <section class="at-notebook lb" id="notebook" aria-labelledby="lb-title">
+      <header class="lb__head" data-lb-head>
+        <p class="at-mono at-kicker">The logbook</p>
+        <h2 id="lb-title" class="lb__title"><span data-lb-words>Everything I carry</span> <em class="lb-sweep">between the stops.</em></h2>
       </header>
 
-      <div class="at-notebook__grid">
-        <div class="at-panel at-panel--route" data-reveal>
-          <h3 class="at-panel__title">The route <span class="at-mono">{real} places · more to come</span></h3>
-          <ol role="list" class="at-timeline" tabindex="0" aria-label="Places, in order" data-lenis-prevent>
-            {places.map((p) => (
-              <li class:list={[{ "is-home": p.home, "is-tba": p.placeholder }]}>
-                <span class="at-mono">{p.home ? "Home" : p.placeholder ? "TBA" : dated(p) ?? "Date to add"}</span>
-                <strong>{p.name}</strong>
-                <span>{p.region}</span>
-              </li>
-            ))}
-          </ol>
+      <div class="lb__grid" data-lb-grid>
+        <div class="tile lb-route" data-tile>
+          <h3 class="lb__h">The route <span class="at-mono">{real} places · more to come</span></h3>
+          <div class="lb-route__scroll" tabindex="0" role="region" aria-label="The route: places, in order" data-lenis-prevent data-route-scroll>
+            <span class="lb-route__track" aria-hidden="true"><span class="lb-route__fill" data-route-fill></span></span>
+            <ol role="list" class="lb-route__list">
+              {places.map((p, i) => (
+                <li class:list={[{ "is-home": p.home, "is-tba": p.placeholder }]} data-route-stop={i}>
+                  <span class="at-mono">{p.home ? "Home" : p.placeholder ? "TBA" : dated(p) ?? "Date to add"}</span>
+                  <strong>{p.name}</strong>
+                  <span>{p.region}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
 
-        <a class="at-door at-door--career" href="/career/" data-reveal data-cursor="Enter">
+        <a class="tile lb-door lb-door--career" href="/career/" data-tile data-door="career">
+          <span class="lb-door__dots" aria-hidden="true"></span>
+          <pre class="lb-door__log" aria-hidden="true" data-gitlog={JSON.stringify(gitLog)}></pre>
           <span class="at-mono">Page 02</span>
           <strong>Career <em>&amp; projects</em></strong>
-          <span>Where I’ve worked, what I’ve shipped, and the code behind it — read as a git log.</span>
-          <span class="at-door__go" aria-hidden="true">→</span>
+          <span class="lb-door__desc">Where I’ve worked, what I’ve shipped, and the code behind it — read as a git log.</span>
+          <span class="lb-door__enter" aria-hidden="true" data-magnet><span>Enter</span><span class="lb-door__arrow">→</span></span>
         </a>
 
-        <a class="at-door at-door--photo" href="/photography/" data-reveal data-cursor="Enter">
-          <img src="/photography/images/hero.jpg" alt="" loading="lazy" decoding="async" />
+        <a class="tile lb-door lb-door--photo" href="/photography/" data-tile data-door="photo">
+          <span class="lb-door__media" data-door-media><img src="/photography/images/hero.jpg" alt="" loading="lazy" decoding="async" /></span>
+          <span class="lb-door__shade" aria-hidden="true"></span>
           <span class="at-mono">Page 03</span>
           <strong>Photo<em>graphy</em></strong>
-          <span>Travel, architecture, wildlife and street — developed from the negative.</span>
-          <span class="at-door__go" aria-hidden="true">→</span>
+          <span class="lb-door__desc">Travel, architecture, wildlife and street — developed from the negative.</span>
+          <span class="lb-door__enter" aria-hidden="true" data-magnet><span>Enter</span><span class="lb-door__arrow">→</span></span>
         </a>
 
-        <div class="at-panel" data-reveal>
-          <h3 class="at-panel__title">Now <span class="at-mono">{now.updated}</span></h3>
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Now <span class="at-mono">{now.updated}</span></h3>
           <ul role="list" class="at-bullets">{now.items.map((t) => <li>{t}</li>)}</ul>
         </div>
 
-        <div class="at-panel" data-reveal>
-          <h3 class="at-panel__title">Writing</h3>
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Writing</h3>
           {posts.slice(0, 3).map((p) => (
             <a class="at-post" href={`/writing/${p.id}/`} data-cursor="Read">
               <strong>{p.data.title}</strong>
@@ -260,8 +269,8 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
           ))}
         </div>
 
-        <div class="at-panel" data-reveal>
-          <h3 class="at-panel__title">Interests</h3>
+        <div class="tile lb-panel" data-tile>
+          <h3 class="lb__h">Interests</h3>
           <dl class="at-interests">
             {interests.map((i) => <div><dt>{i.name}</dt><dd>{i.note}</dd></div>)}
           </dl>
@@ -355,6 +364,8 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   @property --gi { syntax: "<integer>"; initial-value: 0; inherits: false; }
   @property --gf { syntax: "<integer>"; initial-value: 0; inherits: false; }
   @property --sweep { syntax: "<percentage>"; initial-value: 115%; inherits: false; }
+  @property --ft { syntax: "<length>"; initial-value: 0rem; inherits: false; }
+  @property --fb { syntax: "<length>"; initial-value: 3rem; inherits: false; }
   body.at { --t0: 0.55s; }
   .intro { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
   .intro__pin { position: absolute; left: 0; top: 0; translate: 50vw 50svh; animation: intro-out 0.5s ease-in 1.55s both; }
@@ -613,62 +624,109 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   }
   @media (pointer: coarse) { html:has(.jr.is-deck) { scroll-snap-type: y proximity; } }
 
-  /* ---- notebook ---- */
-  .at-notebook { position: relative; padding: clamp(6rem, 16vh, 10rem) var(--gutter); background: linear-gradient(transparent, var(--night) 12rem); }
-  .at-notebook__title { font: 300 clamp(2.5rem, 6vw, 5.5rem)/1 var(--font-display); letter-spacing: -0.03em; max-width: 16ch; }
-  .at-notebook__title em { color: var(--accent); }
-  .at-notebook__grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-top: clamp(3rem, 8vh, 5rem); }
-  .at-panel { grid-column: span 4; padding: 1.75rem; border: 1px solid var(--faint); border-radius: 6px; background: rgba(10, 12, 31, 0.6); }
-  /* size-contained so the long route doesn't stretch the two doors beside it; its list scrolls instead */
-  .at-panel--route { grid-column: span 5; grid-row: span 2; contain: size; display: flex; flex-direction: column; }
-  .at-panel--route .at-timeline {
-    flex: 1; min-height: 0; padding-bottom: 2.5rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--faint) transparent;
-    mask-image: linear-gradient(#000 calc(100% - 3rem), transparent);
+  /* ---- logbook: the unrolled map is its backdrop ---- */
+  .lb { position: relative; padding: clamp(7rem, 22vh, 12rem) var(--gutter) clamp(5rem, 12vh, 8rem); background: radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(4, 5, 13, 0.55) 100%); }
+  .lb__title { font: 300 clamp(2.5rem, 6vw, 5.5rem)/1 var(--font-display); letter-spacing: -0.03em; max-width: 16ch; text-shadow: 0 2px 30px rgba(4, 5, 13, 0.9); }
+  .lb-sweep {
+    background: linear-gradient(90deg, var(--accent) calc(var(--sweep) - 16%), #fff2da calc(var(--sweep) - 4%), var(--accent) var(--sweep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
   }
-  .at-panel__title { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font: 400 1.75rem var(--font-display); margin-bottom: 1.25rem; }
-  .at-panel__title .at-mono { color: var(--muted); text-align: right; }
+  html.js:not(.reduce-motion) .lb__head:not(.is-in) .lb-sweep { --sweep: -18%; }
+  html.js:not(.reduce-motion) .lb__head.is-in .lb-sweep { animation: sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) 0.45s backwards; }
+  .lb__grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: minmax(13.5rem, auto); gap: 1rem; margin-top: clamp(3rem, 8vh, 5rem); perspective: 1400px; }
+
+  /* tiles: a pointer sheen and a border that glows toward the cursor */
+  .tile {
+    position: relative; isolation: isolate; border: 1px solid var(--faint); border-radius: 12px; background: rgba(8, 10, 26, 0.68);
+    --mx: 50%; --my: 50%;
+  }
+  .tile::before, .tile::after { content: ""; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  .tile::before { inset: 0; z-index: 3; background: radial-gradient(34rem circle at var(--mx) var(--my), rgba(255, 236, 200, 0.07), transparent 50%); }
+  .tile::after {
+    inset: -1px; z-index: 4; padding: 1px; background: radial-gradient(22rem circle at var(--mx) var(--my), rgba(255, 180, 84, 0.9), transparent 45%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  html.has-cursor .tile:hover::before, html.has-cursor .tile:hover::after, .tile:focus-within::after { opacity: 1; }
+  .lb-panel { grid-column: span 4; padding: 1.75rem; }
+  .lb__h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.2rem 1rem; font: 400 1.75rem var(--font-display); margin-bottom: 1.25rem; }
+  .lb__h .at-mono { color: var(--muted); text-align: right; }
+
+  /* the route: a scrollable itinerary whose line fills as you read it; hovering a place lights it on the map */
+  .lb-route { grid-column: span 5; grid-row: span 2; display: flex; flex-direction: column; padding: 1.75rem 1.75rem 0.5rem; min-height: 0; }
+  .lb-route__scroll {
+    position: relative; flex: 1; min-height: 0; max-height: 30rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    padding: 0.4rem 0 3rem 1.6rem; outline-offset: 4px; border-radius: 4px;
+    --ft: 0rem; --fb: 3rem;
+    -webkit-mask-image: linear-gradient(transparent, #000 var(--ft), #000 calc(100% - var(--fb)), transparent);
+    mask-image: linear-gradient(transparent, #000 var(--ft), #000 calc(100% - var(--fb)), transparent);
+    transition: --ft 0.3s, --fb 0.3s;
+  }
+  .lb-route__scroll::-webkit-scrollbar { display: none; }
+  .lb-route__track { position: absolute; left: 4px; top: 0.7rem; width: 1px; height: calc(var(--list-h, 100%) - 1.4rem); background: rgba(200, 208, 255, 0.2); }
+  .lb-route__fill { position: absolute; left: 0; top: 0; width: 1px; height: calc(var(--fill, 0) * 100%); background: linear-gradient(var(--accent), var(--land-s)); box-shadow: 0 0 8px rgba(255, 180, 84, 0.6); }
+  .lb-route__list { display: grid; gap: 1.15rem; }
+  .lb-route__list li { position: relative; display: grid; gap: 0.1rem; padding: 0.15rem 0.5rem; margin-left: -0.5rem; border-radius: 6px; transition: background-color 0.3s; }
+  .lb-route__list li::before { content: ""; position: absolute; left: calc(-1.6rem + 1px + 0.5rem); top: 0.55rem; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(255, 180, 84, 0.7); transition: scale 0.3s var(--ease); }
+  .lb-route__list li.is-home::before { background: var(--land-n); box-shadow: 0 0 10px rgba(111, 242, 224, 0.7); }
+  .lb-route__list li.is-tba { opacity: 0.45; }
+  .lb-route__list li:hover { background: rgba(255, 180, 84, 0.07); }
+  .lb-route__list li:hover::before { scale: 1.6; }
+  .lb-route__list .at-mono { color: var(--accent); }
+  .lb-route__list strong { font: 400 1.35rem/1.2 var(--font-display); }
+  .lb-route__list span:last-child { color: var(--muted); font-size: 0.875rem; }
 
   /* doorways to the other two pages */
-  .at-door {
-    grid-column: span 7; position: relative; overflow: hidden; isolation: isolate; display: grid; align-content: end; gap: 0.5rem;
-    min-height: 13rem; padding: 1.5rem 1.75rem; border: 1px solid var(--faint); border-radius: 6px; text-decoration: none;
-    transition: border-color 0.4s, transform 0.6s var(--ease);
+  .lb-door {
+    grid-column: span 7; overflow: hidden; display: grid; align-content: end; gap: 0.5rem;
+    min-height: 13.5rem; padding: 1.5rem 1.75rem; text-decoration: none; transition: border-color 0.4s;
   }
-  .at-door strong { font: 300 clamp(2rem, 3.4vw, 3rem)/0.95 var(--font-display); letter-spacing: -0.03em; }
-  .at-door strong em { color: var(--accent); }
-  .at-door > span:not(.at-mono):not(.at-door__go) { color: var(--muted); max-width: 34rem; }
-  .at-door .at-mono { color: var(--land-n); }
-  .at-door__go { position: absolute; top: 1.5rem; right: 1.75rem; font-size: 1.75rem; transition: transform 0.5s var(--ease); }
-  .at-door:hover { border-color: var(--accent); transform: translateY(-3px); }
-  .at-door:hover .at-door__go { transform: translateX(6px); }
-  .at-door--career { background: radial-gradient(80% 120% at 100% 0%, rgba(77, 124, 255, 0.28), transparent 60%), rgba(10, 12, 31, 0.7); }
-  .at-door--career::before {
-    content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.5;
+  .lb-door > strong, .lb-door > .at-mono, .lb-door__desc { position: relative; z-index: 2; }
+  .lb-door strong { font: 300 clamp(2rem, 3.4vw, 3rem)/0.95 var(--font-display); letter-spacing: -0.03em; }
+  .lb-door strong em { color: var(--accent); }
+  .lb-door__desc { color: var(--muted); max-width: 30rem; padding-right: 7rem; }
+  .lb-door .at-mono { color: var(--land-n); }
+  .lb-door:hover { border-color: rgba(255, 180, 84, 0.5); }
+  /* the magnetic Enter lives in the top-right corner: it follows the cursor a little, never onto the text */
+  .lb-door__enter {
+    position: absolute; top: 1.1rem; right: 1.1rem; z-index: 5; display: grid; place-items: center; gap: 0.1rem; width: 5.2rem; height: 5.2rem;
+    border: 1px solid rgba(255, 180, 84, 0.5); border-radius: 50%; color: var(--accent); background: rgba(4, 5, 13, 0.55);
+    font: 500 0.625rem/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase;
+    transition: background-color 0.35s, color 0.35s, border-color 0.35s;
+  }
+  .lb-door__arrow { font-size: 1.1rem; letter-spacing: 0; transition: transform 0.45s var(--ease); }
+  .lb-door:hover .lb-door__enter, .lb-door:focus-visible .lb-door__enter { background: var(--accent); color: var(--night); border-color: var(--accent); }
+  .lb-door:hover .lb-door__arrow { transform: translateX(4px); }
+  .lb-door--career { background: radial-gradient(80% 120% at 100% 0%, rgba(77, 124, 255, 0.28), transparent 60%), rgba(8, 10, 26, 0.7); }
+  .lb-door__dots {
+    position: absolute; inset: 0; z-index: 0; opacity: 0.45; pointer-events: none;
     background-image: radial-gradient(rgba(200, 208, 255, 0.35) 1px, transparent 1.5px); background-size: 14px 14px;
     mask-image: linear-gradient(115deg, transparent 30%, #000);
   }
-  .at-door--photo img { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.9) brightness(0.55); transition: transform 1.2s var(--ease), filter 0.6s; }
-  .at-door--photo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(4, 5, 13, 0.9), transparent 70%); }
-  .at-door--photo:hover img { transform: scale(1.04); filter: saturate(1) brightness(0.65); }
+  /* the git log types itself behind the card on hover */
+  .lb-door__log {
+    position: absolute; left: 1.75rem; right: 8rem; top: 1.3rem; z-index: 1; margin: 0; white-space: pre; overflow: hidden;
+    font: 400 0.75rem/1.7 var(--font-mono); color: rgba(111, 242, 224, 0.28); opacity: 0; transition: opacity 0.5s;
+  }
+  .lb-door--career:hover .lb-door__log, .lb-door--career:focus-visible .lb-door__log { opacity: 1; }
+  .lb-door__log b { color: rgba(255, 180, 84, 0.45); font-weight: 400; }
+  .lb-door__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .lb-door__media img, .lb-door__media canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .lb-door__media img { filter: saturate(0.9) brightness(0.55); transform: scale(1.02); transition: transform 12s linear, filter 0.6s; }
+  .lb-door--photo:hover .lb-door__media img { transform: scale(1.1); filter: saturate(1) brightness(0.65); }
+  .lb-door__media canvas { opacity: 0; transition: opacity 0.5s; }
+  .lb-door__media.is-gl canvas { opacity: 1; }
+  .lb-door__shade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to top, rgba(4, 5, 13, 0.9), transparent 70%); pointer-events: none; }
   @media (max-width: 1000px) {
-    .at-panel, .at-panel--route, .at-door { grid-column: 1 / -1; grid-row: auto; }
-    .at-panel--route { contain: none; max-height: 34rem; }
+    .lb-panel, .lb-route, .lb-door { grid-column: 1 / -1; grid-row: auto; }
+    .lb-route__scroll { max-height: 26rem; }
   }
-
-  /* .at-panel prefix: base.css's ol[role="list"] reset would otherwise zero the padding and put the rail under the text */
-  .at-panel .at-timeline {
-    position: relative; display: grid; align-content: start; gap: 1.25rem; padding-left: 1.5rem;
-    /* the rail is a local background so it runs the full length of the list when it scrolls */
-    background: linear-gradient(var(--accent), var(--land-s) 60%, var(--faint)) 4px 0.4rem / 1px calc(100% - 0.8rem) no-repeat local;
+  @media (max-width: 600px) {
+    .lb-door__desc { padding-right: 0; }
+    .lb-door { padding-top: 6.5rem; }
+    .lb-door__log { right: 1.5rem; top: 6.4rem; }
   }
-  .at-timeline li { position: relative; display: grid; gap: 0.1rem; }
-  .at-timeline li::before { content: ""; position: absolute; left: calc(-1.5rem + 1px); top: 0.3rem; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(255, 180, 84, 0.7); }
-  .at-timeline li.is-home::before { background: var(--land-n); box-shadow: 0 0 10px rgba(111, 242, 224, 0.7); }
-  .at-timeline li.is-tba { opacity: 0.45; }
-  .at-timeline li.is-tba::before { background: var(--night); border: 1px dashed var(--muted); box-shadow: none; }
-  .at-timeline .at-mono { color: var(--accent); }
-  .at-timeline strong { font: 400 1.35rem/1.2 var(--font-display); }
-  .at-timeline span:last-child { color: var(--muted); font-size: 0.875rem; }
 
   .at-bullets { display: grid; gap: 0.75rem; color: var(--muted); }
   .at-bullets li { padding-left: 1.1rem; position: relative; }

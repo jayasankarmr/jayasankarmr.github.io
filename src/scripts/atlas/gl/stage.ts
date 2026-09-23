@@ -52,12 +52,24 @@ export class Stage {
   }
 
   /** Feed a frame interval while animating; applies any pixel-ratio step. */
+  private cap: number | null = null;
+
   sampleFrame(ms: number) {
     if (this.dpr.sample(ms)) {
-      this.renderer.setPixelRatio(this.dpr.value);
+      this.renderer.setPixelRatio(this.cap === null ? this.dpr.value : Math.min(this.cap, this.dpr.value));
       this.renderer.setSize(this.width, this.height, false);
       this.onResize.forEach((fn) => fn());
     }
+  }
+
+  /** Temporarily cap the pixel ratio (the ambient map); null restores the adaptive value. */
+  setDprCap(cap: number | null) {
+    this.cap = cap;
+    const v = cap === null ? this.dpr.value : Math.min(cap, this.dpr.value);
+    if (v === this.renderer.getPixelRatio()) return;
+    this.renderer.setPixelRatio(v);
+    this.renderer.setSize(this.width, this.height, false);
+    this.onResize.forEach((fn) => fn());
   }
 
   get pixelRatio() {

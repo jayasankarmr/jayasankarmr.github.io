@@ -32,7 +32,7 @@ export class CardDeck {
     if (this.reduced || !this.glPhotos || !this.cards.some((c) => c.querySelector("[data-photo]"))) return;
     const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
       ?? ((cb: () => void) => window.setTimeout(cb, 200));
-    idle(() => void import("../gl/photo-reveal").then((m) => m.warmPhotoReveal()), { timeout: 4000 });
+    idle(() => void import("../gl/photo-reveal").then((m) => m.warmPhotoReveal())); // true idle only
   }
 
   /** Split every pass's text ahead of time, one per idle slot, so a flip never pays for it. */

@@ -11,6 +11,8 @@ import { buildLegs } from "../atlas/journey";
 import { readout } from "../atlas/ui/readout";
 import { JourneyUI, type StopInfo } from "../atlas/ui/journey";
 import { Labels } from "../atlas/labels";
+import { initLogbook } from "../atlas/ui/logbook";
+import { clamp } from "../atlas/motion";
 import type { Director } from "../atlas/scene";
 
 /** First visit this session plays the full opening; the flag is set as soon as it starts. */
@@ -95,6 +97,7 @@ async function main() {
 
   // the stop the page shows: cards + rail (UI), the readout decodes into it
   globe.onStop((i, dir) => {
+    if (globe.mode === "unroll" || globe.mode === "map") return; // map highlights aren't journey stops
     ui.setActive(i, dir);
     const p = stops[Math.max(0, i)];
     if (i >= 0 || !rich) pos.set(p.lat, p.lng, p.name);
@@ -105,7 +108,25 @@ async function main() {
     section.classList.add("is-deck");
     ui.measure();
     ScrollTrigger.refresh();
-    globe.scrollSource = () => ui.read(scrollY);
+    // after the last stop: the unroll (as the logbook enters), the map's drift, the tickets' dimming
+    const nb = document.querySelector<HTMLElement>("#notebook")!, live = document.querySelector<HTMLElement>("#live")!;
+    let nbTop = 0, nbH = 1, liveTop = 0;
+    const measureAfter = () => {
+      nbTop = nb.getBoundingClientRect().top + scrollY;
+      nbH = nb.offsetHeight;
+      liveTop = live.getBoundingClientRect().top + scrollY;
+    };
+    measureAfter();
+    new ResizeObserver(measureAfter).observe(document.body);
+    globe.scrollSource = () => {
+      const s = ui.read(scrollY), vh = innerHeight;
+      return {
+        ...s,
+        unroll: clamp((scrollY - (nbTop - vh)) / (vh * 1.05)),
+        ambient: clamp((scrollY - nbTop) / nbH),
+        dim: clamp((scrollY - (liveTop - vh)) / (vh * 0.7)),
+      };
+    };
     const safeArea = () => {
       const deck = section.querySelector<HTMLElement>("[data-deck]")!.getBoundingClientRect();
       const w = innerWidth, h = innerHeight;
@@ -123,6 +144,17 @@ async function main() {
       ScrollTrigger.create({ trigger: card, start: "top 55%", end: "bottom 55%", onToggle: (st) => st.isActive && globe.focus(i) });
     });
     ScrollTrigger.create({ trigger: section, start: "top 55%", onLeaveBack: () => globe.focus(-1) });
+    // the logbook's backdrop: a crossfade to the flat map instead of the unroll
+    ScrollTrigger.create({
+      trigger: "#notebook", start: "top 60%",
+      onEnter: () => fade(() => globe.setMapInstant(true)),
+      onLeaveBack: () => fade(() => globe.setMapInstant(false)),
+    });
+    const fade = (swap: () => void) => {
+      canvas.style.transition = "opacity 0.25s";
+      canvas.style.opacity = "0";
+      window.setTimeout(() => { swap(); canvas.style.opacity = ""; }, 260);
+    };
   }
 
   let liveAt = 0;
@@ -139,6 +171,7 @@ async function main() {
     labels.active = d.active;
     labels.reached = d.reached;
     labels.enabled = d.introProgress > 0.88; // no labels until the planet has assembled
+    labels.solo = d.mode === "unroll" || d.mode === "map";
     labels.reserved = () => {
       const r = ui.reserved();
       if (d.mode === "hero" || d.mode === "dive") {
@@ -173,12 +206,20 @@ async function main() {
     if (v) awayTimer = window.setTimeout(() => globe.setOffstage(true), 850); // after the 0.8s fade
     else globe.setOffstage(false);
   };
+  // the flat map stays on as the logbook's backdrop; once the footer (opaque, and short enough
+  // that its top may never climb far) is well in view, the scene stops drawing
   ScrollTrigger.create({
-    trigger: "#notebook", start: "top 45%", end: "max",
+    trigger: "#contact", start: "top 70%", end: "max",
     onUpdate: (st) => setAway(st.progress > 0),
     onRefresh: (st) => setAway(st.progress > 0),
   });
 
+  initLogbook(document.querySelector<HTMLElement>("#notebook")!, {
+    reduced: !rich,
+    fine: matchMedia("(hover: hover) and (pointer: fine)").matches,
+    glPhoto: !tier.mobile && tier.name !== "low",
+    highlight: (i) => globe.setHighlight(i),
+  });
   initReveals();
 }
 

@@ -88,14 +88,14 @@ async function captureViewport(browser, vp) {
 
   await toSelector(page, "#notebook", 0);
   await shoot(page, dir, "logbook-head");
-  await toSelector(page, "#notebook .at-notebook__grid, #notebook [data-logbook-grid]", -80);
+  await toSelector(page, "#notebook [data-lb-grid], #notebook .at-notebook__grid", -80);
   await shoot(page, dir, "logbook-grid");
-  const route = page.locator(".at-panel--route").first();
+  const route = page.locator(".lb-route, .at-panel--route").first();
   if (await route.count()) await route.screenshot({ path: join(dir, "logbook-route-panel.png") }).catch(() => {});
 
   if (!vp.mobile) {
     // hover state of the career card (custom cursor label)
-    const door = page.locator(".at-door--career").first();
+    const door = page.locator(".lb-door--career, .at-door--career").first();
     if (await door.count()) {
       await door.scrollIntoViewIfNeeded();
       await settle(page, 800);

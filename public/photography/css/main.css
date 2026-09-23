@@ -50,6 +50,8 @@ a { color: inherit; }
 /* ---------- Base ---------- */
 /* crossfade when arriving from / leaving to the rest of the site (same-origin only) */
 @view-transition { navigation: auto; }
+::view-transition-group(photo-hero) { animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+::view-transition-old(photo-hero), ::view-transition-new(photo-hero) { animation-duration: 0.7s; height: 100%; object-fit: cover; }
 
 html {
   background: var(--bg);
