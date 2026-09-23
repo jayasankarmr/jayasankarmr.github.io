@@ -41,18 +41,21 @@ export const scroll = {
   heroOut: 0.6,
   /** one stop segment (dwell + the leg that follows it) */
   stop: { wide: 0.62, compact: 0.5 },
+  /** scroll spent landed at each stop (in stop units) */
+  dwell: 0.5,
+  /** scroll for the shortest flight (in stop units), so every leg can be steered through */
+  flight: 1.05,
   /** extra scroll per radian of leg length, so long flights feel long (in stop units) */
-  perRadian: 1.4,
-  /** share of a segment spent landed at the stop */
-  dwell: 0.42,
+  perRadian: 2.2,
   /** sphere → map unroll */
   unroll: 1.4,
-  /** idle time before the magnetic dwell glides in, and its duration range */
-  snapIdle: 0.14,
-  snapMin: 0.45,
-  snapMax: 1.1,
+  /** idle time before the magnetic dwell glides in, its pace (s per viewport of travel) and range */
+  snapIdle: 0.5,
+  snapPace: 1.5,
+  snapMin: 0.9,
+  snapMax: 2.2,
   /** how far into a leg (0–1 of the transit) counts as committing to the next stop */
-  commit: 0.15,
+  commit: 0.35,
 } as const;
 
 /** Critically-damped-ish springs as (stiffness, damping) for the small spring integrator. */

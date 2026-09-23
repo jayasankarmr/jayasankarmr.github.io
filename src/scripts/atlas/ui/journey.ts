@@ -175,7 +175,7 @@ export class JourneyUI {
     }
     if (target === null || Math.abs(target - scrollY) < 2) return;
     this.snapping = true;
-    const duration = clamp((Math.abs(target - scrollY) / innerHeight) * 0.9, S.snapMin, S.snapMax);
+    const duration = clamp((Math.abs(target - scrollY) / innerHeight) * S.snapPace, S.snapMin, S.snapMax);
     lenis.scrollTo(target, { duration, easing: ease.inOut, onComplete: () => (this.snapping = false) });
   }
 

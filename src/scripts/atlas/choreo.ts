@@ -11,7 +11,7 @@ export type Layout = { units: number[]; starts: number[]; total: number };
 /** Scroll units per stop segment: the dwell plus the leg after it; long legs get more. */
 export function segmentLayout(legs: Pick<Leg, "angle">[], stops: number): Layout {
   const units: number[] = [];
-  for (let i = 0; i < stops; i++) units.push(i < stops - 1 ? 1 + legs[i].angle * scroll.perRadian : scroll.dwell + 0.25);
+  for (let i = 0; i < stops; i++) units.push(i < stops - 1 ? scroll.dwell + scroll.flight + legs[i].angle * scroll.perRadian : scroll.dwell + 0.25);
   const starts: number[] = [];
   let acc = 0;
   for (const u of units) { starts.push(acc); acc += u; }
