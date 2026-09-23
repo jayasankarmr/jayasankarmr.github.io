@@ -12,6 +12,7 @@ import { concerts } from "../data/concerts";
 import { now, interests } from "../data/now";
 import { career, commitHash, commitMessage } from "../data/career";
 import { buildLegs, formatKm } from "../scripts/atlas/journey";
+import { code39 } from "../lib/code39";
 
 const posts = (await getCollection("writing", ({ data }) => !data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 const coord = (lat: number, lng: number) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? "E" : "W"}`;
@@ -23,6 +24,13 @@ const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocal
 const cities = new Set(concerts.map((c) => c.city)).size;
 const home = places[0];
 const chars = (t: string) => [...t];
+// tickets: 3 across, and the last row's stubs widen so no slot is ever left empty (5 → 3 + 2)
+const ticketSpan = (i: number, n: number) => {
+  const r = n % 3, lastRow = i >= n - r;
+  return r && lastRow ? 6 / r : 2;
+};
+const stopIndex = (city: string) => places.findIndex((p) => p.name === city);
+const barcodeText = (c: { when: string }, i: number) => `NO${pad(i + 1)} ${c.when.replace(/-/g, "")}`;
 // the career card's background: the same log /career/ renders, one line per entry
 const gitLog = career.map((c, i) => `${commitHash(c)} ${i === 0 ? "(HEAD -> main) " : ""}${commitMessage(c)}`);
 
@@ -279,25 +287,59 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     </section>
 
     <!-- ============ LIVE ============ -->
-    <section class="at-live" id="live" aria-labelledby="at-live-title">
-      <header class="at-live__head">
+    <section class="at-live tk" id="live" aria-labelledby="at-live-title">
+      <header class="tk__head">
         <p class="at-mono at-kicker" data-reveal>Ticket stubs</p>
-        <h2 id="at-live-title" class="at-live__title" data-reveal="split">Some stops were <em>for the music.</em></h2>
+        <div class="tk__titlewrap">
+          <svg class="tk__wave" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true">
+            <path d={Array.from({ length: 241 }, (_, k) => { const x = k * 5; const y = 60 + Math.sin(x * 0.021) * 22 * Math.sin(x * 0.0041 + 1) + Math.sin(x * 0.083) * 7; return `${k ? "L" : "M"}${x} ${y.toFixed(1)}`; }).join("")} />
+          </svg>
+          <h2 id="at-live-title" class="at-live__title" data-reveal="split">Some stops were <em>for the music.</em></h2>
+        </div>
         <p class="at-mono at-live__count" data-reveal>{concerts.length} shows · {cities} cities</p>
       </header>
-      <ol role="list" class="at-stubs">
-        {concerts.map((c, i) => (
-          <li class="at-stub" data-reveal>
-            <div class="at-stub__main">
-              <span class="at-mono">Admit one · No. {pad(i + 1)}</span>
-              <strong class="at-stub__artist">{c.artist}</strong>
-              <span class="at-stub__where">{c.event ? `${c.event}, ${c.city}` : c.city}</span>
-            </div>
-            <div class="at-stub__tear">
-              <time class="at-mono" datetime={c.when}>{showDate(c.when)}</time>
-            </div>
-          </li>
-        ))}
+      <ol role="list" class="tk__grid" data-tickets>
+        {concerts.map((c, i) => {
+          const where = c.event ? `${c.event}, ${c.city}` : c.city;
+          const bc = code39(barcodeText(c, i));
+          const stop = stopIndex(c.city);
+          return (
+            <li class="tk__slot" style={`--span: ${ticketSpan(i, concerts.length)}`}>
+              {/* named by its front; the back repeats it, except venue and note (when they exist),
+                  which reach screen readers as the button's description */}
+              <button type="button" class="ticket" data-ticket data-stop={stop >= 0 ? stop : undefined} aria-pressed="false"
+                aria-describedby={[c.venue && `tk${i}-vl tk${i}-v`, c.note && `tk${i}-nl tk${i}-n`].filter(Boolean).join(" ") || undefined}>
+                <span class="ticket__inner">
+                  <span class="ticket__face ticket__front">
+                    <span class="ticket__main">
+                      <span class="at-mono ticket__admit"><span aria-hidden="true">Admit one · </span>No. {pad(i + 1)}</span>
+                      <strong class="ticket__artist">{c.artist}</strong>
+                      <span class="ticket__where">{where}</span>
+                    </span>
+                    <span class="ticket__stub">
+                      <time class="at-mono" datetime={c.when}>{showDate(c.when)}</time>
+                    </span>
+                    <span class="ticket__foil"></span>
+                  </span>
+                  <span class="ticket__face ticket__back" aria-hidden="true">
+                    <span class="ticket__back-grid at-mono">
+                      <span>No.</span><span>{pad(i + 1)} / {pad(concerts.length)}</span>
+                      <span>Artist</span><span>{c.artist}</span>
+                      <span id={`tk${i}-vl`}>Venue</span><span id={`tk${i}-v`}>{c.venue ?? c.event ?? c.city}</span>
+                      <span>City</span><span>{c.city}</span>
+                      <span>Date</span><span>{showDate(c.when)}</span>
+                      {c.note && <><span id={`tk${i}-nl`}>Note</span><span id={`tk${i}-n`}>{c.note}</span></>}
+                    </span>
+                    <svg class="ticket__barcode" viewBox={`0 0 ${bc.width} 40`} preserveAspectRatio="none">
+                      <path d={bc.bars.map(([x, w]) => `M${x} 0h${w}v40h-${w}z`).join("")} />
+                    </svg>
+                    <span class="at-mono ticket__code">{barcodeText(c, i)}</span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ol>
     </section>
 
@@ -321,9 +363,13 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     --ink: #eef0ff;
     --muted: rgba(226, 230, 255, 0.62);
     --faint: rgba(200, 208, 255, 0.15);
-    /* warm accent against a cool planet: route, pins, kickers */
-    --accent: #ffb454;
-    --accent-2: #ff6f91;
+    /* warm accent against a cool planet: route, pins, kickers. The ticket section blends the
+       accent toward pink (--accent-mix, scrubbed by src/scripts/atlas/ui/tickets.ts) */
+    --amber: #ffb454;
+    --pink: #ff6f91;
+    --accent-mix: 0;
+    --accent: var(--amber);
+    --accent-2: var(--pink);
     /* globe: land shades cyan (north) → violet (south) inside an electric-blue halo */
     --land-n: #6ff2e0;
     --land-s: #9d7bff;
@@ -348,6 +394,14 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
       var(--night);
     color: var(--ink);
     font: 400 1rem/1.65 var(--font-body);
+  }
+  /* The blend only reaches what is on screen with the tickets: the nav, the section head and
+     the footer. Re-declaring the chain on those three keeps each scrubbed frame's style work to
+     their subtrees; a variable changed on body would restyle the whole document every frame. */
+  .at .site-nav, .at .tk__head, .at .at-footer {
+    --accent: color-mix(in oklab, var(--pink) calc(var(--accent-mix) * 100%), var(--amber));
+    --chrome-accent: var(--accent);
+    --focus: var(--accent);
   }
   .at ::selection { background: var(--accent); color: var(--night); }
   .at em { font-style: italic; }
@@ -740,29 +794,86 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .at-interests dd { color: var(--muted); font-size: 0.875rem; }
 
   /* ---- live: concerts as ticket stubs ---- */
-  .at-live { position: relative; padding: clamp(4rem, 10vh, 7rem) var(--gutter) clamp(2rem, 6vh, 4rem); background: var(--night); }
-  .at-live__head { display: grid; gap: 0; }
+  .tk { position: relative; padding: clamp(5rem, 12vh, 8rem) var(--gutter) clamp(3rem, 8vh, 5rem); background: linear-gradient(transparent, rgba(4, 5, 13, 0.82) 22rem); }
+  .tk__titlewrap { position: relative; isolation: isolate; }
   .at-live__title { font: 300 clamp(2.5rem, 6vw, 5.5rem)/1 var(--font-display); letter-spacing: -0.03em; max-width: 16ch; }
-  .at-live__title em { color: var(--accent-2); }
+  .at-live__title em { color: var(--pink); }
   .at-live__count { margin-top: 1.5rem; color: var(--muted); }
-  .at-stubs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-top: clamp(2.5rem, 6vh, 4rem); }
-  .at-stub {
-    --notch: 0.7rem;
-    display: grid; grid-template-columns: 1fr auto; min-height: 9.5rem; border-radius: 6px;
-    background: radial-gradient(120% 140% at 0% 0%, rgba(255, 111, 145, 0.16), transparent 55%), rgba(10, 12, 31, 0.85);
-    border: 1px solid var(--faint);
+  /* a decorative waveform breathing behind the headline (no audio) */
+  .tk__wave { position: absolute; left: -4%; top: 50%; z-index: -1; width: 108%; height: 7rem; translate: 0 -50%; overflow: visible; pointer-events: none; }
+  .tk__wave path { fill: none; stroke: var(--pink); stroke-width: 1.2; opacity: 0.32; vector-effect: non-scaling-stroke; stroke-dasharray: 3 6; transform-origin: 50% 50%; animation: wave-run 7s linear infinite, wave-beat 1.7s ease-in-out infinite; }
+  @keyframes wave-run { to { stroke-dashoffset: -180; } }
+  @keyframes wave-beat { 0%, 100% { transform: scaleY(0.65); } 50% { transform: scaleY(1.15); } }
+  .tk:not(.is-on) .tk__wave path { animation-play-state: paused; } /* runs only while its headline is on screen */
+
+  /* three across; the last row's stubs widen so there is never an empty slot (5 → 3 + 2) */
+  .tk__grid { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-top: clamp(2.5rem, 6vh, 4rem); }
+  .tk__slot { grid-column: span var(--span, 2); perspective: 1400px; }
+  .ticket { position: relative; display: block; width: 100%; height: 10.5rem; text-align: left; border-radius: 10px; --mx: 50%; --my: 50%; --ang: 0; }
+  .ticket__inner { position: absolute; inset: 0; transition: transform 0.8s var(--ease); }
+  .ticket__face { position: absolute; inset: 0; border-radius: 10px; }
+  /* The flip's 3D, and the GPU layers it costs on every frame, only exists once a ticket is in
+     play: tickets.ts adds .is-3d on first hover, touch or focus. Until then there is no back. */
+  .ticket.is-3d .ticket__inner { transform-style: preserve-3d; }
+  .ticket.is-3d .ticket__face { backface-visibility: hidden; }
+  .ticket[aria-pressed="true"] .ticket__inner { transform: rotateY(180deg); }
+  .ticket__front {
+    display: grid; grid-template-columns: 1fr 7.5rem; overflow: hidden; border: 1px solid var(--faint);
+    background: radial-gradient(120% 140% at 0% 0%, rgba(255, 111, 145, 0.18), transparent 55%), rgba(10, 12, 31, 0.9);
     /* the two half-circle bites where the stub tears off */
+    --notch: 0.7rem;
     mask: radial-gradient(circle at calc(100% - 7.5rem) 0, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat,
           radial-gradient(circle at calc(100% - 7.5rem) 100%, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat;
-    transition: transform 0.5s var(--ease), border-color 0.4s;
+    transition: border-color 0.4s;
   }
-  .at-stub:hover { transform: translateY(-3px) rotate(-0.4deg); border-color: var(--accent-2); }
-  .at-stub__main { display: grid; align-content: space-between; gap: 0.75rem; padding: 1.4rem 1.5rem; }
-  .at-stub__main .at-mono { color: var(--accent-2); }
-  .at-stub__artist { font: 400 clamp(1.6rem, 2.6vw, 2.1rem)/1.05 var(--font-display); letter-spacing: -0.02em; }
-  .at-stub__where { color: var(--muted); font-size: 0.875rem; }
-  .at-stub__tear { width: 7.5rem; display: grid; place-items: center; border-left: 2px dashed var(--faint); padding: 1rem; text-align: center; }
-  .at-stub__tear .at-mono { color: var(--ink); writing-mode: vertical-rl; rotate: 180deg; font-size: 0.75rem; }
+  /* paper grain */
+  .ticket__front::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.18; mix-blend-mode: overlay;
+    background: var(--grain, none) 0 0 / 128px 128px; /* src/scripts/atlas/ui/grain.ts, set as the tickets arrive */
+  }
+  .ticket:hover .ticket__front, .ticket:focus-visible .ticket__front { border-color: rgba(255, 111, 145, 0.7); }
+  .ticket__main { position: relative; z-index: 1; display: grid; align-content: space-between; gap: 0.6rem; padding: 1.25rem 1.4rem; }
+  .ticket__admit { color: var(--pink); }
+  .ticket__artist { font: 400 clamp(1.5rem, 2.4vw, 2.05rem)/1.05 var(--font-display); letter-spacing: -0.02em; color: var(--ink); }
+  .ticket__where { color: var(--muted); font-size: 0.875rem; }
+  /* the perforated stub: tears a little on its hinge when you hover */
+  .ticket__stub {
+    position: relative; z-index: 1; display: grid; place-items: center; padding: 1rem; border-left: 2px dashed var(--faint);
+    transform-origin: 0 0; transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .ticket__stub time { color: var(--ink); writing-mode: vertical-rl; rotate: 180deg; font-size: 0.75rem; }
+  html.has-cursor .ticket:hover .ticket__stub { transform: rotate(4deg) translateX(2px); }
+  /* holographic foil: hue follows the pointer's angle across the ticket, strength follows the tilt */
+  .ticket__foil {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.1; mix-blend-mode: color-dodge; transition: opacity 0.4s;
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.22) calc(var(--mx) - 2%), transparent calc(var(--mx) + 12%)),
+      conic-gradient(from calc(var(--ang) * 1deg) at var(--mx) var(--my), #ff6f91, #ffd36f, #6ff2e0, #9d7bff, #ff6f91);
+  }
+  .ticket:hover .ticket__foil { opacity: 0.32; }
+  .ticket__back {
+    transform: rotateY(180deg); display: none; grid-template-rows: 1fr auto auto; gap: 0.4rem; padding: 1rem 1.3rem;
+    border: 1px solid rgba(255, 111, 145, 0.55); background: linear-gradient(160deg, #1b1330, #0d0b1f);
+  }
+  .ticket.is-3d .ticket__back { display: grid; }
+  .ticket__back-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; align-content: start; color: var(--muted); font-size: 0.625rem; }
+  .ticket__back-grid span:nth-child(even) { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ticket__barcode { width: 100%; height: 2.2rem; fill: var(--ink); }
+  .ticket__code { color: var(--pink); font-size: 0.625rem; text-align: center; letter-spacing: 0.3em; }
+  @media (max-width: 1000px) {
+    .tk__grid { grid-template-columns: repeat(2, 1fr); }
+    .tk__slot { grid-column: span 1; }
+    .tk__slot:last-child:nth-child(odd) { grid-column: span 2; }
+  }
+  @media (max-width: 640px) {
+    .tk__grid { grid-template-columns: 1fr; }
+    .tk__slot, .tk__slot:last-child:nth-child(odd) { grid-column: auto; }
+    .ticket__front { grid-template-columns: 1fr 5.5rem; mask: radial-gradient(circle at calc(100% - 5.5rem) 0, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat, radial-gradient(circle at calc(100% - 5.5rem) 100%, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticket__inner { transition: none; }
+    .tk__wave path { animation: none; }
+  }
 
   /* ---- footer ---- */
   .at-footer { position: relative; padding: clamp(6rem, 16vh, 10rem) var(--gutter) 2rem; background: var(--night); }

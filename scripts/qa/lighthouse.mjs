@@ -28,7 +28,8 @@ for (let i = 0; i < 60; i++) {
 const env = { ...process.env, CHROME_PATH: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" };
 const rows = [];
 const RUNS = +(process.env.RUNS ?? 3);
-for (const mode of ["mobile", "desktop"]) {
+const MODES = (process.env.MODES ?? "mobile,desktop").split(","); // e.g. MODES=mobile for quick A/B checks
+for (const mode of MODES) {
   const base = join(out, `lighthouse-${mode}`);
   const runs = [];
   for (let i = 0; i < RUNS; i++) {

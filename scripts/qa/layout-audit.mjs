@@ -32,7 +32,10 @@ for (let i = -1; i < count; i++) {
       const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
       return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
     };
-    const rgba = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    // resolve any CSS colour (rgb, oklab, color-mix…) to sRGB bytes through a 1×1 canvas
+    const cx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    cx.canvas.width = cx.canvas.height = 1;
+    const rgba = (s) => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = s; cx.fillRect(0, 0, 1, 1); const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
     const bg = [4, 5, 13];
     const effOpacity = (el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; };
     const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, r }; };

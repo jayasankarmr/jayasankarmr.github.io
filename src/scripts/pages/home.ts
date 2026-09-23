@@ -12,6 +12,7 @@ import { readout } from "../atlas/ui/readout";
 import { JourneyUI, type StopInfo } from "../atlas/ui/journey";
 import { Labels } from "../atlas/labels";
 import { initLogbook } from "../atlas/ui/logbook";
+import { initTickets } from "../atlas/ui/tickets";
 import { clamp } from "../atlas/motion";
 import type { Director } from "../atlas/scene";
 
@@ -75,6 +76,7 @@ async function main() {
     canvas.remove();
     labelsRoot.remove();
     document.querySelector("[data-globe-ctl]")?.remove();
+    initTickets(document.querySelector<HTMLElement>("#live")!, { reduced: !rich, fine: matchMedia("(hover: hover) and (pointer: fine)").matches });
     initReveals();
     return;
   }
@@ -214,6 +216,11 @@ async function main() {
     onRefresh: (st) => setAway(st.progress > 0),
   });
 
+  initTickets(document.querySelector<HTMLElement>("#live")!, {
+    reduced: !rich,
+    fine: matchMedia("(hover: hover) and (pointer: fine)").matches,
+    highlight: (i) => globe.setHighlight(i),
+  });
   initLogbook(document.querySelector<HTMLElement>("#notebook")!, {
     reduced: !rich,
     fine: matchMedia("(hover: hover) and (pointer: fine)").matches,
