@@ -1,0 +1,17 @@
+/* Custom cursor (scripts/motion/cursor.ts). Colour via --cursor-ink per concept. */
+html.has-cursor, html.has-cursor a, html.has-cursor button { cursor: none; }
+.cursor { position: fixed; inset: 0; pointer-events: none; z-index: 9999; opacity: 0; transition: opacity 0.3s; }
+.cursor.is-active { opacity: 1; }
+.cursor__dot, .cursor__ring { position: absolute; top: 0; left: 0; border-radius: 50%; }
+.cursor__dot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: var(--cursor-ink, #fff); }
+.cursor__ring {
+  width: 38px; height: 38px; margin: -19px 0 0 -19px;
+  border: 1px solid var(--cursor-ring, currentColor); color: var(--cursor-ink, #fff);
+  display: grid; place-items: center;
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1), height 0.4s cubic-bezier(0.22, 1, 0.36, 1), margin 0.4s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, border-color 0.3s;
+}
+.cursor.is-hover .cursor__ring { width: 64px; height: 64px; margin: -32px 0 0 -32px; }
+.cursor.has-label .cursor__ring { width: 92px; height: 92px; margin: -46px 0 0 -46px; background: var(--cursor-fill, #fff); border-color: transparent; }
+.cursor.has-label .cursor__dot { opacity: 0; }
+.cursor__label { font: 500 0.625rem/1 var(--font-mono, monospace); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cursor-label, #000); opacity: 0; transition: opacity 0.2s; }
+.cursor.has-label .cursor__label { opacity: 1; }

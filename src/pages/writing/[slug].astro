@@ -1,0 +1,49 @@
+---
+import { getCollection, render } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import SiteNav from "../../components/SiteNav.astro";
+import SiteFooter from "../../components/SiteFooter.astro";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("writing", ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const date = post.data.date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+---
+<Base
+  title={`${post.data.title} — Jayasankar M R`}
+  description={post.data.summary}
+  fonts="family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500"
+  bodyClass="post"
+>
+  <SiteNav contact="/#contact" />
+  <main id="main" class="post__main">
+    <a class="post__back" href="/#notebook">← The logbook</a>
+    <article>
+      <header>
+        <p class="post__meta"><time datetime={post.data.date.toISOString()}>{date}</time> · {post.data.tags.join(" · ")}</p>
+        <h1>{post.data.title}</h1>
+        <p class="post__lede">{post.data.summary}</p>
+      </header>
+      <div class="post__body"><Content /></div>
+    </article>
+    <SiteFooter />
+  </main>
+</Base>
+
+<style is:global>
+  body.post { background: #0c0b0a; color: #ede8df; font: 400 1.0625rem/1.75 Inter, system-ui, sans-serif; --focus: #e8a33d; }
+  body.post { --chrome-bg: rgba(12, 11, 10, 0.72); --chrome-accent: #e8a33d; }
+  .post__main { max-width: 42rem; margin: 0 auto; padding: calc(var(--chrome-h) + clamp(1.5rem, 6vw, 4rem)) 1.25rem 2rem; }
+  .post__back { font-size: 0.8125rem; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; opacity: 0.6; }
+  .post__back:hover { opacity: 1; }
+  .post__meta { margin-top: 3rem; font-size: 0.8125rem; letter-spacing: 0.08em; opacity: 0.55; }
+  .post h1 { font: 400 clamp(2.5rem, 7vw, 4.5rem)/1 "Instrument Serif", Georgia, serif; margin: 0.75rem 0 1.25rem; }
+  .post__lede { font-size: 1.25rem; opacity: 0.75; }
+  .post__body { margin-top: 3rem; }
+  .post__body > * + * { margin-top: 1.25em; }
+  .post__body a { color: #e8a33d; }
+</style>

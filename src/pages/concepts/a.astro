@@ -1,0 +1,383 @@
+---
+// Concept A — "Darkroom": cinematic, filmic. The page is a roll of film.
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import "../../styles/cursor.css";
+import { site, socials } from "../../data/site";
+import { career } from "../../data/career";
+import { getProjects } from "../../data/projects";
+import { places } from "../../data/travel";
+import { now } from "../../data/now";
+
+const projects = (await getProjects()).slice(0, 4);
+const posts = (await getCollection("writing", ({ data }) => !data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const roles = career.slice(0, 4);
+const yr = (d?: string) => (d ? d.slice(0, 4) : "Now");
+
+const photos = [
+  { src: "/photography/images/gallery-01.jpg", w: 933, h: 1400, title: "Ember", meta: "Lohri bonfire, North India" },
+  { src: "/photography/images/gallery-02.jpg", w: 1400, h: 933, title: "Departure", meta: "Red Line, New Delhi" },
+  { src: "/photography/images/gallery-03.jpg", w: 866, h: 1400, title: "Transmission", meta: "An unplanned alignment", pick: true },
+  { src: "/photography/images/gallery-04.jpg", w: 1400, h: 957, title: "Unseen", meta: "Machla Magra Hill, Udaipur" },
+  { src: "/photography/images/gallery-05.jpg", w: 1050, h: 1400, title: "Crown", meta: "City Palace, Udaipur" },
+  { src: "/photography/images/gallery-06.jpg", w: 1400, h: 933, title: "Pulse", meta: "One last DJ night" },
+];
+// film-edge numbering: every frame reads "▸ 07 … 07A" like a real negative strip
+const edge = (i: number) => String(i + 1).padStart(2, "0");
+---
+<Base
+  title="Jayasankar M R — Darkroom (concept A)"
+  fonts="family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Geist:wght@400;500"
+  bodyClass="dr"
+  noindex
+>
+  <div class="dr-loader" data-loader>
+    <p class="dr-loader__label">Developing</p>
+    <p class="dr-loader__count"><span data-loader-count>000</span></p>
+    <span class="dr-loader__bar" data-loader-bar></span>
+  </div>
+
+  <header class="dr-header">
+    <a class="dr-header__brand" href="#main" data-magnetic>Jayasankar <em>M R</em></a>
+    <nav class="dr-header__nav" aria-label="Primary">
+      <a href="#roll">Roll</a>
+      <a href="#roll-code">Code</a>
+      <a href="/photography/">Photography</a>
+      <a href="#roll-travel">Travel</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <p class="dr-header__clock"><span>Kochi</span> <time data-clock>--:--</time> IST</p>
+  </header>
+
+  <main id="main">
+    <!-- ============ HERO ============ -->
+    <section class="dr-hero" data-hero aria-label="Introduction">
+      <img class="dr-hero__fallback" src="/photography/images/hero.jpg" alt="" fetchpriority="high" />
+      <canvas class="dr-hero__canvas" data-hero-canvas aria-hidden="true"></canvas>
+
+      <p class="dr-hero__status" aria-hidden="true"><span class="dr-dot"></span> <span data-status>Developing…</span></p>
+
+      <div class="dr-hero__content" data-hero-content>
+        <h1 class="dr-hero__title">
+          <span class="dr-hero__first" data-hero-title>Jayasankar</span>
+          <span class="dr-hero__last">M R</span>
+        </h1>
+        <div class="dr-hero__meta">
+          <p class="dr-mono dr-hero__roll">Roll 01 — Frame 00</p>
+          <p class="dr-hero__role">{site.role}. {site.location}.</p>
+          <p class="dr-hero__intro">{site.intro}</p>
+        </div>
+      </div>
+
+      <div class="dr-hero__cue" aria-hidden="true"><span>Scroll to develop</span><i></i></div>
+    </section>
+
+    <!-- ============ STATEMENT ============ -->
+    <section class="dr-statement" aria-label="About">
+      <p class="dr-mono dr-kicker" data-reveal>(About)</p>
+      <p class="dr-statement__text" data-reveal="split">
+        I build <em>dependable systems</em> by day, and spend the rest of it standing still — waiting for the light to turn <em>honest</em>.
+      </p>
+      <div class="dr-statement__cols">
+        <div data-reveal>
+          <p class="dr-mono dr-kicker">Now — {now.updated}</p>
+          <ul role="list" class="dr-list">{now.items.map((i) => <li>{i}</li>)}</ul>
+        </div>
+        <div data-reveal>
+          <p class="dr-mono dr-kicker">Elsewhere</p>
+          <ul role="list" class="dr-list dr-list--links">
+            {socials.map((s) => <li><a href={s.href} target="_blank" rel="noopener">{s.label} <span>{s.handle} ↗</span></a></li>)}
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CONTACT SHEET (horizontal) ============ -->
+    <section class="dr-roll" id="roll" data-roll aria-label="Contact sheet: career, code, photographs, travel, writing">
+      <div class="dr-roll__head">
+        <p class="dr-mono">Contact sheet · Roll 01 · {career.length + projects.length + photos.length} exposures</p>
+        <p class="dr-mono dr-roll__hint" aria-hidden="true">Keep scrolling →</p>
+      </div>
+
+      <div class="dr-roll__viewport" data-roll-viewport>
+        <ol class="dr-roll__track" role="list" data-roll-track>
+          <!-- Career -->
+          <li class="dr-frame dr-frame--text" id="roll-career">
+            <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(0)}</span><span>{edge(0)}A</span></p>
+            <div class="dr-frame__card">
+              <p class="dr-mono dr-kicker">01 — Career</p>
+              <h2 class="dr-frame__title">Where I’ve <em>worked</em></h2>
+              <ol role="list" class="dr-career">
+                {roles.map((r) => (
+                  <li>
+                    <span class="dr-mono">{yr(r.start)}–{r.end ? yr(r.end) : "Now"}</span>
+                    <strong>{r.title}</strong>
+                    <span>{r.org}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </li>
+
+          <!-- Code -->
+          <li class="dr-frame dr-frame--text" id="roll-code">
+            <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(1)}</span><span>{edge(1)}A</span></p>
+            <div class="dr-frame__card">
+              <p class="dr-mono dr-kicker">02 — Code</p>
+              <h2 class="dr-frame__title">Things I’ve <em>built</em></h2>
+              <ul role="list" class="dr-projects">
+                {projects.map((p) => (
+                  <li>
+                    <a href={p.url} target="_blank" rel="noopener" data-cursor="Repo">
+                      <strong>{p.name}</strong>
+                      <span>{p.description}</span>
+                      <span class="dr-mono">{p.language ?? p.tags[0]}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+
+          <!-- Photographs -->
+          {photos.map((p, i) => (
+            <li class="dr-frame dr-frame--photo" style={`--ar:${p.w}/${p.h}`}>
+              <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(i + 2)}</span><span>{edge(i + 2)}A</span></p>
+              <a class="dr-frame__photo" href="/photography/#gallery" data-leak data-cursor="View">
+                <img src={p.src} width={p.w} height={p.h} alt={`${p.title} — ${p.meta}`} loading="lazy" decoding="async" />
+                <canvas aria-hidden="true"></canvas>
+              </a>
+              {p.pick && (
+                <svg class="dr-pick" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
+                  <path data-pick d="M6 9 C 30 3, 70 5, 95 7 C 97 40, 96 100, 94 133 C 60 137, 30 136, 5 134 C 3 100, 4 40, 8 5" />
+                </svg>
+              )}
+              <p class="dr-frame__caption"><span class="dr-mono">{String(i + 1).padStart(2, "0")}</span> {p.title} <span>— {p.meta}</span></p>
+            </li>
+          ))}
+
+          <!-- Travel -->
+          <li class="dr-frame dr-frame--text" id="roll-travel">
+            <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(8)}</span><span>{edge(8)}A</span></p>
+            <div class="dr-frame__card">
+              <p class="dr-mono dr-kicker">04 — Travel</p>
+              <h2 class="dr-frame__title">Places the <em>roll</em> has been</h2>
+              <ul role="list" class="dr-places">
+                {places.map((p) => (
+                  <li><strong>{p.name}</strong> <span class="dr-mono">{p.lat.toFixed(2)}°N {p.lng.toFixed(2)}°E</span></li>
+                ))}
+              </ul>
+            </div>
+          </li>
+
+          <!-- Writing -->
+          <li class="dr-frame dr-frame--text">
+            <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(9)}</span><span>{edge(9)}A</span></p>
+            <div class="dr-frame__card">
+              <p class="dr-mono dr-kicker">05 — Writing</p>
+              {posts.slice(0, 2).map((p) => (
+                <a class="dr-post" href={`/writing/${p.id}/`} data-cursor="Read">
+                  <h2 class="dr-frame__title">{p.data.title}</h2>
+                  <p>{p.data.summary}</p>
+                </a>
+              ))}
+            </div>
+          </li>
+
+          <!-- End of roll -->
+          <li class="dr-frame dr-frame--end">
+            <p class="dr-frame__edge"><span>JMR 400</span><span>▸ {edge(10)}</span><span>END</span></p>
+            <a class="dr-end" href="/photography/" data-cursor="Enter" data-magnetic="0.2">
+              <span class="dr-mono">The full roll</span>
+              <span class="dr-end__title">Photography <em>→</em></span>
+            </a>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ CONTACT ============ -->
+    <footer class="dr-footer" id="contact">
+      <p class="dr-mono dr-kicker" data-reveal>(Contact)</p>
+      <a class="dr-footer__cta" href={`mailto:${site.email}`} data-reveal="chars" data-cursor="Write">Say <em>hello.</em></a>
+      <div class="dr-footer__row">
+        <a class="dr-mono" href={`mailto:${site.email}`}>{site.email}</a>
+        <ul role="list">{socials.map((s) => <li><a class="dr-mono" href={s.href} target="_blank" rel="noopener">{s.label} ↗</a></li>)}</ul>
+        <p class="dr-mono">© 2026 · {site.location}</p>
+      </div>
+    </footer>
+  </main>
+</Base>
+
+<script>
+  import "../../scripts/concepts/darkroom";
+</script>
+
+<style is:global>
+  body.dr {
+    --bg: #0b0908;
+    --bg-2: #131110;
+    --ink: #efe6da;
+    --muted: rgba(239, 230, 218, 0.56);
+    --faint: rgba(239, 230, 218, 0.16);
+    --safelight: #e5432a;
+    --amber: #e8a33d;
+    --font-display: "Instrument Serif", Georgia, serif;
+    --font-mono: "Geist Mono", ui-monospace, monospace;
+    --font-body: "Geist", system-ui, sans-serif;
+    --gutter: clamp(1.25rem, 3.5vw, 3rem);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --cursor-ink: var(--ink);
+    --cursor-fill: var(--safelight);
+    --cursor-label: #fff;
+    --focus: var(--amber);
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 1rem/1.6 var(--font-body);
+  }
+  .dr em { font-style: italic; }
+  .dr ::selection { background: var(--safelight); color: #fff; }
+  .dr-mono { font: 500 0.6875rem/1.4 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; }
+  .dr-kicker { color: var(--amber); margin-bottom: 1.25rem; }
+
+  /* ---- loader ---- */
+  .dr-loader {
+    position: fixed; inset: 0; z-index: 100; background: #070605; clip-path: inset(0);
+    display: grid; place-content: end start; padding: var(--gutter); color: var(--safelight);
+  }
+  html:not(.js) .dr-loader { display: none; }
+  .dr-loader__label { font: 500 0.75rem var(--font-mono); letter-spacing: 0.3em; text-transform: uppercase; animation: dr-blink 1.2s steps(2) infinite; }
+  .dr-loader__count { font: 400 clamp(6rem, 22vw, 20rem)/0.85 var(--font-display); font-variant-numeric: tabular-nums; }
+  .dr-loader__bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--safelight); transform: scaleX(0); transform-origin: left; }
+  @keyframes dr-blink { 50% { opacity: 0.35; } }
+
+  /* ---- header ---- */
+  .dr-header {
+    position: fixed; inset: 0 0 auto; z-index: 50; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    padding: 1.25rem var(--gutter); color: var(--ink);
+    background: linear-gradient(rgba(11, 9, 8, 0.55), transparent);
+  }
+  .dr-header__brand { font: 400 1.35rem/1 var(--font-display); text-decoration: none; justify-self: start; }
+  .dr-header__nav { display: flex; gap: clamp(1rem, 2.5vw, 2.25rem); }
+  .dr-header__nav a { font: 500 0.6875rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; opacity: 0.75; transition: opacity 0.3s; }
+  .dr-header__nav a:hover { opacity: 1; }
+  .dr-header__clock { justify-self: end; font: 500 0.6875rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .dr-header__clock span { opacity: 0.55; }
+  @media (max-width: 767px) {
+    .dr-header { grid-template-columns: 1fr auto; }
+    .dr-header__nav { display: none; }
+  }
+
+  /* ---- hero ---- */
+  .dr-hero { position: relative; height: 100svh; min-height: 34rem; overflow: clip; isolation: isolate; }
+  .dr-hero__fallback, .dr-hero__canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .dr-hero__fallback { filter: sepia(0.25) contrast(1.05) brightness(0.7); }
+  .dr-hero__canvas { opacity: 0; transition: opacity 0.6s; }
+  .dr-hero__canvas.is-live { opacity: 1; }
+  .dr-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(11, 9, 8, 0.85), transparent 55%); pointer-events: none; }
+  .dr-hero__status { position: absolute; top: 5.5rem; left: var(--gutter); z-index: 2; font: 500 0.6875rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; display: flex; align-items: center; gap: 0.6rem; }
+  .dr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--safelight); box-shadow: 0 0 12px var(--safelight); animation: dr-blink 1s steps(2) infinite; }
+  .dr-hero.is-fixed .dr-dot { background: var(--amber); box-shadow: 0 0 12px var(--amber); animation: none; }
+
+  .dr-hero__content {
+    position: absolute; inset: auto var(--gutter) clamp(2rem, 6vh, 4rem); z-index: 2;
+    display: grid; grid-template-columns: 1fr minmax(16rem, 24rem); gap: 2rem; align-items: end;
+  }
+  .dr-hero__title { position: relative; justify-self: start; font: 400 clamp(4.5rem, 17.5vw, 19rem)/0.78 var(--font-display); letter-spacing: -0.035em; font-style: italic; text-shadow: 0 0.02em 0.25em rgba(0, 0, 0, 0.25); }
+  .dr-hero__first { display: block; padding-right: 0.08em; }
+  /* initials sit like a superscript off the last letter, clear of the J's descender */
+  .dr-hero__last { position: absolute; top: 0.3em; left: 100%; font: 500 0.75rem var(--font-mono); font-style: normal; letter-spacing: 0.3em; white-space: nowrap; color: var(--amber); }
+  .dr-hero__meta { display: grid; gap: 0.75rem; padding-bottom: 1rem; }
+  .dr-hero__roll { color: var(--amber); }
+  .dr-hero__role { font: 400 1.5rem/1.2 var(--font-display); }
+  .dr-hero__intro { color: var(--muted); font-size: 0.9375rem; max-width: 24rem; }
+  .dr-hero__cue { position: absolute; left: 50%; bottom: 1.5rem; z-index: 2; translate: -50% 0; display: grid; justify-items: center; gap: 0.75rem; font: 500 0.625rem var(--font-mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  .dr-hero__cue i { width: 1px; height: 2.75rem; background: linear-gradient(var(--ink), transparent); transform-origin: top; animation: dr-cue 2.2s var(--ease) infinite; }
+  @keyframes dr-cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+  @media (max-width: 900px) {
+    .dr-hero__content { grid-template-columns: 1fr; }
+    .dr-hero__cue { display: none; }
+  }
+
+  /* entrance (after loader) */
+  html.js .dr-hero__meta > *, html.js .dr-hero__status { opacity: 0; transform: translateY(1rem); transition: opacity 1s var(--ease), transform 1.2s var(--ease); }
+  html.js.is-loaded .dr-hero__meta > *, html.js.is-loaded .dr-hero__status { opacity: 1; transform: none; }
+  html.js.is-loaded .dr-hero__meta > :nth-child(2) { transition-delay: 0.1s; }
+  html.js.is-loaded .dr-hero__meta > :nth-child(3) { transition-delay: 0.2s; }
+
+  /* ---- statement ---- */
+  .dr-statement { padding: clamp(6rem, 18vh, 12rem) var(--gutter); max-width: 90rem; margin: 0 auto; }
+  .dr-statement__text { font: 400 clamp(2.25rem, 5.6vw, 5.5rem)/1.02 var(--font-display); letter-spacing: -0.02em; max-width: 18ch; }
+  .dr-statement__text em { color: var(--amber); }
+  .dr-statement__cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 3rem; margin-top: clamp(4rem, 10vh, 7rem); max-width: 56rem; margin-left: auto; }
+  .dr-list { display: grid; gap: 0.75rem; color: var(--muted); }
+  .dr-list li { padding-bottom: 0.75rem; border-bottom: 1px solid var(--faint); }
+  .dr-list--links a { display: flex; justify-content: space-between; gap: 1rem; text-decoration: none; color: var(--ink); }
+  .dr-list--links a span { color: var(--muted); transition: color 0.3s; }
+  .dr-list--links a:hover span { color: var(--amber); }
+
+  /* ---- contact sheet ---- */
+  .dr-roll { position: relative; background: var(--bg-2); overflow: clip; }
+  /* sits below the fixed header while the sheet is pinned */
+  .dr-roll__head { position: absolute; inset: 5.25rem 0 auto; z-index: 1; display: flex; justify-content: space-between; padding: 0 var(--gutter); color: var(--muted); }
+  .dr-roll__hint { color: var(--amber); }
+  .dr-roll__viewport { height: 100svh; min-height: 36rem; display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; padding-top: 3rem; }
+  .dr-roll__viewport::-webkit-scrollbar { display: none; }
+  html.dr-pinned .dr-roll__viewport { overflow: visible; scroll-snap-type: none; }
+  .dr-roll__track {
+    --frame-h: min(58svh, 34rem);
+    display: flex; gap: 0.5rem; padding: 3.25rem var(--gutter); align-items: stretch; width: max-content;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='14'%3E%3Crect x='7' y='1' width='16' height='12' rx='2.5' fill='%230b0908'/%3E%3C/svg%3E") repeat-x left 0.9rem,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='14'%3E%3Crect x='7' y='1' width='16' height='12' rx='2.5' fill='%230b0908'/%3E%3C/svg%3E") repeat-x left bottom 0.9rem,
+      #1b1715;
+    will-change: transform;
+  }
+  .dr-frame { position: relative; flex: none; height: var(--frame-h); scroll-snap-align: center; display: flex; flex-direction: column; }
+  .dr-frame__edge { position: absolute; top: -2.1rem; left: 0; right: 0; display: flex; justify-content: space-between; font: 500 0.5625rem var(--font-mono); letter-spacing: 0.2em; color: var(--amber); opacity: 0.8; }
+  .dr-frame--text { width: calc(var(--frame-h) * 0.8); }
+  .dr-frame__card { flex: 1; background: var(--bg); padding: clamp(1.25rem, 2.5vw, 2rem); display: flex; flex-direction: column; overflow: hidden; }
+  .dr-frame__title { font: 400 clamp(1.9rem, 3vw, 2.75rem)/1 var(--font-display); letter-spacing: -0.01em; margin-bottom: auto; padding-bottom: 1.5rem; }
+  .dr-frame__title em { color: var(--amber); }
+  .dr-career, .dr-projects, .dr-places { display: grid; gap: 0; }
+  .dr-career li { display: grid; grid-template-columns: 6.5rem 1fr; column-gap: 1rem; padding: 0.7rem 0; border-top: 1px solid var(--faint); font-size: 0.875rem; }
+  .dr-career li span:last-child { grid-column: 2; color: var(--muted); }
+  .dr-career .dr-mono { color: var(--muted); padding-top: 0.2em; }
+  .dr-projects a { display: grid; grid-template-columns: 1fr auto; gap: 0.1rem 1rem; padding: 0.7rem 0; border-top: 1px solid var(--faint); text-decoration: none; font-size: 0.875rem; transition: color 0.3s; }
+  .dr-projects a span:nth-child(2) { grid-column: 1; color: var(--muted); font-size: 0.8125rem; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .dr-projects a .dr-mono { grid-row: 1; grid-column: 2; color: var(--amber); }
+  .dr-projects a:hover strong { color: var(--amber); }
+  .dr-places li { display: flex; justify-content: space-between; align-items: baseline; padding: 0.7rem 0; border-top: 1px solid var(--faint); font: 400 1.35rem var(--font-display); }
+  .dr-places .dr-mono { color: var(--muted); }
+  .dr-post { display: block; text-decoration: none; padding-top: 1rem; border-top: 1px solid var(--faint); }
+  .dr-post + .dr-post { margin-top: 1.5rem; }
+  .dr-post .dr-frame__title { font-size: 2rem; padding-bottom: 0.75rem; }
+  .dr-post p { color: var(--muted); font-size: 0.875rem; }
+  .dr-post:hover .dr-frame__title { color: var(--amber); }
+
+  .dr-frame--photo { aspect-ratio: var(--ar); }
+  .dr-frame__photo { position: relative; flex: 1; display: block; overflow: hidden; background: #000; }
+  .dr-frame__photo img, .dr-frame__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .dr-frame__photo img { filter: saturate(0.85) brightness(0.9); transition: filter 0.6s, transform 1.2s var(--ease); }
+  .dr-frame__photo:hover img { filter: none; transform: scale(1.04); }
+  .dr-frame__photo canvas { opacity: 0; }
+  .dr-frame__photo canvas.is-live { opacity: 1; }
+  .dr-frame__caption { position: absolute; bottom: -2.25rem; left: 0; font: 400 1rem var(--font-display); white-space: nowrap; }
+  .dr-frame__caption span:not(.dr-mono) { color: var(--muted); }
+  .dr-frame__caption .dr-mono { color: var(--amber); margin-right: 0.4rem; }
+  .dr-pick { position: absolute; top: -4%; left: -6%; width: 112%; height: 108%; pointer-events: none; overflow: visible; }
+  .dr-pick path { fill: none; stroke: var(--safelight); stroke-width: 2.2; vector-effect: non-scaling-stroke; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(229, 67, 42, 0.5)); }
+
+  .dr-frame--end { width: calc(var(--frame-h) * 0.9); }
+  .dr-end { flex: 1; display: grid; place-content: center; gap: 1rem; text-align: center; text-decoration: none; background: var(--safelight); color: #fff; }
+  .dr-end__title { font: 400 clamp(2.5rem, 5vw, 4.5rem)/1 var(--font-display); }
+
+  /* ---- footer ---- */
+  .dr-footer { padding: clamp(6rem, 20vh, 12rem) var(--gutter) 2rem; }
+  .dr-footer__cta { display: block; font: 400 clamp(5rem, 20vw, 22rem)/0.85 var(--font-display); letter-spacing: -0.04em; text-decoration: none; }
+  .dr-footer__cta em { color: var(--safelight); }
+  .dr-footer__row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1.5rem; margin-top: clamp(3rem, 10vh, 6rem); padding-top: 1.5rem; border-top: 1px solid var(--faint); color: var(--muted); }
+  .dr-footer__row ul { display: flex; gap: 1.5rem; }
+  .dr-footer__row a { text-decoration: none; transition: color 0.3s; }
+  .dr-footer__row a:hover { color: var(--ink); }
+</style>

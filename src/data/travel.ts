@@ -1,0 +1,46 @@
+// Places on the map, in the order the story visits them (oldest first after home).
+// The home-page globe, its route and the travel timeline all render from this array.
+export type Place = {
+  id: string;
+  name: string;
+  region: string;
+  lat: number;
+  lng: number;
+  note: string;
+  /** "2024-01" or "2024" — shown on the timeline; omit if unknown */
+  when?: string;
+  /** a place visited again and again from `when` on, not a single trip */
+  recurring?: boolean;
+  /** a path under /photography/images when a frame exists for the place */
+  photo?: string;
+  /** Google Photos shared-album or Instagram post URL for the trip */
+  link?: string;
+  home?: boolean;
+  /** reached overland from the previous stop on the same trip — drawn as a low ground leg, not a new flight */
+  leg?: boolean;
+  /** stand-in stop until real trip data is imported; rendered dimmed and marked TBA */
+  placeholder?: boolean;
+};
+
+// TODO(Jay): photos to come — add `photo` (and `link`) per stop as frames are picked.
+export const places: Place[] = [
+  { id: "thrissur", name: "Thrissur", region: "Kerala", lat: 10.53, lng: 76.21, note: "Born here. Every route on this map starts in Kerala.", home: true },
+  { id: "goa", name: "Goa", region: "West coast", lat: 15.49, lng: 73.83, note: "A May trip to the coast, the summer before college.", when: "2023-05" },
+  { id: "srm", name: "SRM IST", region: "Delhi NCR", lat: 28.8, lng: 77.54, note: "Moved north for a B.Tech — the base camp for most of what follows.", when: "2023-08" },
+  { id: "delhi", name: "New Delhi", region: "Delhi", lat: 28.61, lng: 77.21, note: "The stop I keep coming back to — concerts, sightseeing, the Red Line at dusk.", when: "2023-08", recurring: true, leg: true, photo: "/photography/images/gallery-02.jpg" },
+  { id: "alappuzha", name: "Alappuzha", region: "Kerala", lat: 9.5, lng: 76.34, note: "Back south for the backwaters.", when: "2023-10" },
+  { id: "dehradun", name: "Dehradun & Mussoorie", region: "Uttarakhand", lat: 30.4, lng: 78.05, note: "Up into the hills for December.", when: "2023-12" },
+  { id: "bengaluru", name: "Bengaluru", region: "Karnataka", lat: 12.97, lng: 77.59, note: "First visit in March 2024, and back many times over the degree.", when: "2024-03", recurring: true },
+  { id: "lucknow", name: "Lucknow", region: "Uttar Pradesh", lat: 26.85, lng: 80.95, note: "The city of nawabs, in May.", when: "2024-05" },
+  { id: "kodaikanal", name: "Kodaikanal", region: "Tamil Nadu", lat: 10.24, lng: 77.49, note: "Into the Palani Hills in June.", when: "2024-06" },
+  { id: "jaipur", name: "Jaipur", region: "Rajasthan", lat: 26.91, lng: 75.79, note: "The Pink City in October.", when: "2024-10" },
+  { id: "phuket", name: "Phuket", region: "Thailand", lat: 7.88, lng: 98.39, note: "First leg of ten days in Thailand — the Andaman coast, 20–23 December.", when: "2024-12" },
+  { id: "pattaya", name: "Pattaya", region: "Thailand", lat: 12.93, lng: 100.88, note: "Across to the Gulf of Thailand, 23–26 December.", when: "2024-12", leg: true },
+  { id: "bangkok", name: "Bangkok", region: "Thailand", lat: 13.76, lng: 100.5, note: "Seeing the year out in the capital, 26–30 December.", when: "2024-12", leg: true },
+  { id: "prayagraj", name: "Prayagraj", region: "Uttar Pradesh", lat: 25.43, lng: 81.88, note: "The Maha Kumbh at the Triveni Sangam.", when: "2025-02" },
+  { id: "varanasi", name: "Varanasi", region: "Uttar Pradesh", lat: 25.32, lng: 83.01, note: "The ghats along the Ganga, a month after the Kumbh.", when: "2025-03" },
+  { id: "mumbai", name: "Mumbai", region: "Maharashtra", lat: 19.08, lng: 72.88, note: "April in the city by the sea.", when: "2025-04" },
+  { id: "udaipur", name: "Udaipur", region: "Rajasthan", lat: 24.58, lng: 73.68, note: "Palace domes, and a peacock hiding on Machla Magra Hill.", when: "2025-10", photo: "/photography/images/gallery-05.jpg" },
+  { id: "hyderabad", name: "Hyderabad", region: "Telangana", lat: 17.39, lng: 78.49, note: "December in the city of pearls.", when: "2025-12" },
+  { id: "varkala", name: "Varkala", region: "Kerala", lat: 8.74, lng: 76.72, note: "Home again — cliffs over the Arabian Sea.", when: "2026-06" },
+];

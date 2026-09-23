@@ -32,6 +32,17 @@
   filter: brightness(1.06) contrast(1.02);
 }
 
+/* develop-from-negative canvas (js/develop.js) sits over the photo; the
+   <img> stays hidden until the canvas has handed back to it */
+.hero__develop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+html.hero-develop .hero__media img { opacity: 0; }
+
 .hero__scrim {
   position: absolute;
   inset: 0;

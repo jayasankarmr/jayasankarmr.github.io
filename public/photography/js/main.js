@@ -1,5 +1,6 @@
 /* ==========================================================================
-   main.js — shared site behavior: header scroll state + parallax engine.
+   main.js — shared page behavior: parallax engine + reveals.
+   (The header's scroll state lives in /shared/chrome.js.)
    Classic scripts (no ES modules) so the site also works over file:// —
    everything shared hangs off a single `Portfolio` global.
    Load order matters: main.js first, then per-section scripts.
@@ -18,13 +19,6 @@ window.Portfolio = (function () {
      desktop-sized; on mobile the sections render as static compositions. */
   function motionAllowed() {
     return !mqReduce.matches && !mqNarrow.matches;
-  }
-
-  /* ---------- header scroll state ---------- */
-  var header = document.querySelector("[data-header]");
-
-  function updateHeader() {
-    if (header) header.classList.toggle("is-scrolled", window.scrollY > 24);
   }
 
   /* ---------- parallax engine ----------
@@ -59,14 +53,11 @@ window.Portfolio = (function () {
   }
 
   window.addEventListener("scroll", function () {
-    updateHeader();
     requestTick();
   }, { passive: true });
 
   mqReduce.addEventListener("change", onMotionPrefChange);
   mqNarrow.addEventListener("change", onMotionPrefChange);
-
-  updateHeader();
 
   return {
     motionAllowed: motionAllowed,

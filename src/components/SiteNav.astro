@@ -1,0 +1,28 @@
+---
+// Shared header — identical on every page; styled by public/shared/chrome.css.
+// The default slot replaces the right-hand readout (defaults to the Kerala clock).
+import { pages, type PageId } from "../data/site";
+
+interface Props {
+  current?: PageId;
+  /** where "Contact" points — the page's own #contact, or home's from pages without one */
+  contact?: string;
+}
+const { current, contact = "#contact" } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+<header class="site-nav" data-site-nav>
+  <a class="site-nav__brand" href="/" aria-label="Jayasankar M R — home">
+    <span class="site-nav__brand-full">Jayasankar <em>M R</em></span>
+    <span class="site-nav__brand-short" aria-hidden="true">J<em>MR</em></span>
+  </a>
+  <nav class="site-nav__links" aria-label="Site">
+    {pages.map((p, i) => (
+      <a href={p.href} aria-current={p.id === current ? "page" : undefined}><i>{pad(i + 1)}</i>{p.label}</a>
+    ))}
+  </nav>
+  <div class="site-nav__end">
+    <span class="site-nav__meta"><slot>Kerala · <time data-site-clock>--:--</time> IST</slot></span>
+    <a class="site-nav__contact" href={contact}>Contact</a>
+  </div>
+</header>
