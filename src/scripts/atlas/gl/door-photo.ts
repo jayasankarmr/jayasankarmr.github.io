@@ -36,7 +36,7 @@ export async function initDoorPhoto(media: HTMLElement) {
   const s = new Surface(canvas, FRAG);
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const w = Math.min(img.naturalWidth, Math.round(media.clientWidth * dpr));
-  const bmp = await createImageBitmap(img, { resizeWidth: w, resizeHeight: Math.round((w * img.naturalHeight) / img.naturalWidth), resizeQuality: "high" });
+  const bmp = await createImageBitmap(img, { resizeWidth: w, resizeHeight: Math.round((w * img.naturalHeight) / img.naturalWidth), resizeQuality: "high", imageOrientation: "flipY" });
   s.textureFrom(bmp, "uTex");
   s.set("uTexSize", [bmp.width, bmp.height]);
   bmp.close();

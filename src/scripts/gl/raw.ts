@@ -76,7 +76,8 @@ export class Surface {
     });
   }
 
-  /** Uploads an already-decoded source (e.g. a resized ImageBitmap) into texture unit `unit`. */
+  /** Uploads an already-decoded source into texture unit `unit`. UNPACK_FLIP_Y is ignored for an
+   *  ImageBitmap, so create one with `imageOrientation: "flipY"` or it lands upside down. */
   textureFrom(source: TexImageSource, name: string, unit = 0) {
     const { gl } = this;
     const t = gl.createTexture();

@@ -52,7 +52,7 @@ export async function revealPhoto(fig: HTMLElement, img: HTMLImageElement, durat
   // decode + downscale off the main thread to the size the pass actually shows, then upload that
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const w = Math.min(img.naturalWidth, Math.round(fig.clientWidth * dpr));
-  const bmp = await createImageBitmap(img, { resizeWidth: w, resizeHeight: Math.round((w * img.naturalHeight) / img.naturalWidth), resizeQuality: "high" });
+  const bmp = await createImageBitmap(img, { resizeWidth: w, resizeHeight: Math.round((w * img.naturalHeight) / img.naturalWidth), resizeQuality: "high", imageOrientation: "flipY" });
   const { canvas, s } = warmPhotoReveal();
   fig.appendChild(canvas);
   canvas.style.display = "";
