@@ -19,7 +19,10 @@ const coord = (lat: number, lng: number) => `${Math.abs(lat).toFixed(2)}°${lat 
 const when = (d: string) => new Date(d.length === 4 ? `${d}-01-01` : `${d}-01`).toLocaleDateString("en-GB", d.length === 4 ? { year: "numeric" } : { month: "short", year: "numeric" });
 const pad = (n: number) => String(n).padStart(2, "0");
 const real = places.filter((p) => !p.placeholder).length;
-const dated = (p: Place) => p.when ? (p.recurring ? `Since ${when(p.when)} · on repeat` : when(p.when)) : null;
+// the pass's date line: a range when the visit's last day is known, a count for places on repeat
+const dated = (p: Place) => !p.when ? null
+  : p.recurring ? `Since ${when(p.when)} · on repeat${p.visits ? ` · ${p.visits} visits` : ""}`
+  : p.until ? `${when(p.when)} – ${showDate(p.until)}` : when(p.when);
 const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocaleDateString("en-GB", d.length === 7 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric" });
 const cities = new Set(concerts.map((c) => c.city)).size;
 const home = places[0];
@@ -489,6 +492,9 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .at-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; transition: opacity 0.8s; }
   .at-globe:not(.is-live) { opacity: 0; }
   .at-globe.is-away, .lbls.is-away { opacity: 0; pointer-events: none; }
+  /* no WebGL: the build-time map (src/pages/atlas-map.svg.ts) as a quiet backdrop */
+  .at-map-static { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.42; pointer-events: none; }
+  html.no-globe .at-hero__hint { display: none; }
   html:not(.has-cursor) .at-globe { pointer-events: none; }
   /* the context cursor draws its own turning glyph over the planet */
   html.has-cursor .at-globe, html.has-cursor.is-dragging-globe, html.has-cursor.is-dragging-globe .at-globe { cursor: none; }
@@ -808,6 +814,10 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .lb-door__media img { filter: saturate(0.9) brightness(0.55); transform: scale(1.02); transition: transform 12s linear, filter 0.6s; }
   .lb-door--photo:hover .lb-door__media img { transform: scale(1.1); filter: saturate(1) brightness(0.65); }
   .lb-door__media canvas { opacity: 0; transition: opacity 0.5s; }
+  @media (prefers-reduced-motion: reduce) {
+    .lb-door__media img, .lb-door--photo:hover .lb-door__media img { transform: scale(1.02); transition: filter 0.6s; }
+    .lb-door:hover .lb-door__arrow { transform: none; }
+  }
   .lb-door__media.is-gl canvas { opacity: 1; }
   .lb-door__shade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to top, rgba(4, 5, 13, 0.9), transparent 70%); pointer-events: none; }
   @media (max-width: 1000px) {
@@ -909,8 +919,14 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     .ticket__front { grid-template-columns: 1fr 5.5rem; mask: radial-gradient(circle at calc(100% - 5.5rem) 0, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat, radial-gradient(circle at calc(100% - 5.5rem) 100%, #0000 var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ticket__inner { transition: none; }
     .tk__wave path { animation: none; }
+    /* the flip becomes a crossfade: no rotation, the faces trade places */
+    .ticket__inner, .ticket[aria-pressed="true"] .ticket__inner { transition: none; transform: none; }
+    .ticket__back { transform: none; }
+    .ticket__face { transition: opacity 0.2s; }
+    .ticket.is-3d .ticket__back { opacity: 0; }
+    .ticket[aria-pressed="true"] .ticket__front { opacity: 0; }
+    .ticket[aria-pressed="true"] .ticket__back { opacity: 1; }
   }
 
   /* ---- footer ---- */

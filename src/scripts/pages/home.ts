@@ -9,15 +9,11 @@ import { registerMotion, ramp, smooth } from "../atlas/motion";
 import { detectTier } from "../atlas/tier";
 import { buildLegs } from "../atlas/journey";
 import { readout } from "../atlas/ui/readout";
-import { JourneyUI, type StopInfo } from "../atlas/ui/journey";
-import { Labels } from "../atlas/labels";
-import { initLogbook } from "../atlas/ui/logbook";
-import { initTickets } from "../atlas/ui/tickets";
+import type { StopInfo } from "../atlas/ui/journey";
 import { atlasCursor } from "../atlas/ui/cursor";
 import { navRoute } from "../atlas/ui/navroute";
 import { initSkew } from "../atlas/ui/skew";
 import { film } from "../atlas/ui/film";
-import { footerArc } from "../atlas/ui/footer";
 import { clamp } from "../atlas/motion";
 import type { Director } from "../atlas/scene";
 
@@ -70,9 +66,16 @@ async function main() {
     onUpdate: (st) => route.set(st.progress * (stops.length - 1)),
     onRefresh: (st) => route.set(st.progress * (stops.length - 1)),
   });
+  // past the journey (however you got there: a flick, End, an anchor), the nav's readout rests
+  // on the last stop rather than on whatever it was showing when the journey was skipped
+  const lastStop = stops[stops.length - 1];
+  const settleReadout = (st: ScrollTrigger) => { if (st.progress >= 1) pos.set(lastStop.lat, lastStop.lng, lastStop.name); };
+  ScrollTrigger.create({ trigger: section, start: "top top", end: "bottom top", onUpdate: settleReadout, onRefresh: settleReadout });
   // display type leans with the scroll (desktop: phones scroll natively, and it would only cost them)
   if (rich && finePointer()) initSkew([...document.querySelectorAll<HTMLElement>(".at-hero__title, .lb__title, .at-live__title, .at-footer__cta")]);
 
+  // the second wave (journey deck, labels, the sections below) loads alongside the scene
+  const laterP = import("./home-later");
   const tier = detectTier();
   document.documentElement.dataset.tier = tier.name;
   const globeP: Promise<Director | null> = tier.name !== "none"
@@ -82,13 +85,20 @@ async function main() {
     : Promise.resolve(null);
 
   // the hero's type is already rising (CSS, from first paint); the globe joins when it's ready
-  const globe = await globeP;
+  const [globe, { JourneyUI, Labels, initLogbook, initTickets, footerArc }] = await Promise.all([globeP, laterP]);
   globeRef = globe;
 
   if (!globe) {
     section.querySelectorAll<HTMLImageElement>("img[data-src]").forEach((img) => { img.loading = "lazy"; img.src = img.dataset.src!; });
     document.documentElement.classList.add("no-globe");
-    canvas.remove();
+    // the static map (built from the same data at build time) stands in for the scene
+    const map = new Image();
+    map.className = "at-map-static";
+    map.alt = "";
+    map.decoding = "async";
+    map.src = "/atlas-map.svg";
+    canvas.replaceWith(map);
+    film(map, false);
     labelsRoot.remove();
     document.querySelector("[data-globe-ctl]")?.remove();
     initTickets(document.querySelector<HTMLElement>("#live")!, { reduced: !rich, fine: matchMedia("(hover: hover) and (pointer: fine)").matches });

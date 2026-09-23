@@ -20,15 +20,14 @@ export type Place = {
   leg?: boolean;
   /** stand-in stop until real trip data is imported; rendered dimmed and marked TBA */
   placeholder?: boolean;
-  /** how this stop was reached. Unlocks the transport line on the boarding pass and the route
-   *  style (rail ties, road dashes, ferry dots). Omit when unknown: the card shows no mode and
-   *  the route falls back to `leg` (overland) or a neutral arc. */
+  /** how this stop was reached: shown as the transport line on the boarding pass ("By train").
+   *  Omit when unknown: the pass shows "Overland" for `leg` stops, otherwise nothing. */
   mode?: "flight" | "train" | "road" | "bus" | "ferry";
   /** alt text for `photo`; defaults to "Photograph from {name}" */
   photoAlt?: string;
-  /** "2024-12-26": last day of a multi-day visit, shown as a date range on the boarding pass */
+  /** "2024-12-26": last day of a multi-day visit; the pass shows "Dec 2024 – 26 Dec 2024" */
   until?: string;
-  /** how many times a recurring stop has been visited; scales its "on repeat" loops */
+  /** how many times a recurring stop has been visited; the pass adds "· 6 visits" to "on repeat" */
   visits?: number;
 };
 
