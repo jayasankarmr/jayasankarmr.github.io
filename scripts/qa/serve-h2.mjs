@@ -36,7 +36,7 @@ server.on("stream", (stream, headers) => {
   const type = TYPES[extname(file)] ?? "application/octet-stream";
   const accept = String(headers["accept-encoding"] ?? "");
   const enc = COMPRESS.test(type) ? (accept.includes("br") ? "br" : accept.includes("gzip") ? "gzip" : null) : null;
-  const key = `${file}|${enc}`;
+  const key = `${file}|${enc}|${statSync(file).mtimeMs}`; // a rebuild must never serve stale bodies
   let body = cache.get(key);
   if (!body) {
     const raw = readFileSync(file);

@@ -20,6 +20,8 @@ const real = places.filter((p) => !p.placeholder).length;
 const dated = (p: Place) => p.when ? (p.recurring ? `Since ${when(p.when)} · on repeat` : when(p.when)) : null;
 const showDate = (d: string) => new Date(d.length === 7 ? `${d}-01` : d).toLocaleDateString("en-GB", d.length === 7 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric" });
 const cities = new Set(concerts.map((c) => c.city)).size;
+const home = places[0];
+const chars = (t: string) => [...t];
 
 // journey: legs, trips and distances come from the data (src/scripts/atlas/journey.ts)
 const legs = buildLegs(places);
@@ -53,10 +55,12 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   ]}
   bodyClass="at"
 >
-  <div class="at-loader" data-loader>
-    <p class="at-mono">Charting a route from {coord(places[0].lat, places[0].lng)}</p>
-    <p class="at-loader__count"><span data-loader-count>000</span></p>
-    <span class="at-loader__bar" data-loader-bar></span>
+  <!-- the opening: an amber pin on Thrissur while its coordinates count up (pure CSS, no JS needed) -->
+  <div class="intro" data-intro aria-hidden="true">
+    <div class="intro__pin" data-intro-pin style={`--to-li: ${Math.trunc(Math.abs(home.lat))}; --to-lf: ${Math.round((Math.abs(home.lat) % 1) * 100)}; --to-gi: ${Math.trunc(Math.abs(home.lng))}; --to-gf: ${Math.round((Math.abs(home.lng) % 1) * 100)};`}>
+      <span class="intro__dot"></span>
+      <span class="intro__coord at-mono" data-ns={home.lat >= 0 ? "N" : "S"} data-ew={home.lng >= 0 ? "E" : "W"}></span>
+    </div>
   </div>
 
   <canvas class="at-globe" data-globe aria-hidden="true"></canvas>
@@ -68,19 +72,20 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
     <!-- ============ HERO ============ -->
     <section class="at-hero" data-hero aria-labelledby="at-name">
       <div class="at-hero__col">
-        <p class="at-mono at-kicker" data-hero-in>An atlas of one — Vol. 01</p>
+        <p class="at-mono at-kicker in-kicker">An atlas of one — Vol. 01</p>
         <h1 id="at-name" class="at-hero__title">
-          <span class="at-hero__line" data-hero-line>Jayasankar</span>
-          <span class="at-hero__line at-hero__line--it" data-hero-line><em>from Kerala, outward.</em></span>
+          <span class="sr-only">Jayasankar, from Kerala, outward.</span>
+          <span class="at-hero__line in-mask" aria-hidden="true">{chars("Jayasankar").map((c, i) => <span class="ch" style={`--i: ${i}`}><span class="ch__sz">{c}</span><span class="ch__g">{c}</span></span>)}</span>
+          <span class="at-hero__line at-hero__line--it" aria-hidden="true"><em class="in-sweep">from Kerala, outward.</em></span>
         </h1>
-        <p class="at-hero__intro" data-hero-in>{site.intro}</p>
-        <div class="at-hero__ctas" data-hero-in>
-          <a class="at-btn at-btn--solid" href="#journey" data-magnetic="0.25">Begin the journey <span aria-hidden="true">↓</span></a>
-          <a class="at-btn" href="/career/" data-magnetic="0.25">Career &amp; code <span aria-hidden="true">→</span></a>
-          <a class="at-btn" href="/photography/" data-magnetic="0.25">Photography <span aria-hidden="true">→</span></a>
+        <p class="at-hero__intro in-up">{site.intro}</p>
+        <div class="at-hero__ctas">
+          <a class="at-btn at-btn--solid in-cta" style="--k: 0" href="#journey" data-magnetic="0.25">Begin the journey <span aria-hidden="true">↓</span></a>
+          <a class="at-btn in-cta" style="--k: 1" href="/career/" data-magnetic="0.25">Career &amp; code <span aria-hidden="true">→</span></a>
+          <a class="at-btn in-cta" style="--k: 2" href="/photography/" data-magnetic="0.25">Photography <span aria-hidden="true">→</span></a>
         </div>
       </div>
-      <div class="at-hero__hint" data-hero-in aria-hidden="true">
+      <div class="at-hero__hint in-late" aria-hidden="true">
         <svg class="at-gesture" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
           <circle cx="24" cy="22" r="13" opacity="0.45" />
           <ellipse class="at-gesture__meridian" cx="24" cy="22" rx="6" ry="13" opacity="0.8" />
@@ -162,7 +167,9 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
                       <p class="pass__note" data-note>{p.note}</p>
                       {p.photo && (
                         <figure class="pass__photo" data-photo>
-                          <img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" />
+                          <!-- loaded when the pass is first shown (the deck stacks every pass in one place) -->
+                          <img data-src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} decoding="async" />
+                          <noscript><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" /></noscript>
                         </figure>
                       )}
                       {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
@@ -338,12 +345,78 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   .at-mono { font: 500 0.6875rem/1.4 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; }
   .at-kicker { color: var(--accent); margin-bottom: 1.25rem; }
 
-  /* ---- loader ---- */
-  .at-loader { position: fixed; inset: 0; z-index: 100; background: var(--night); display: grid; place-content: center; justify-items: center; gap: 1rem; clip-path: inset(0); }
-  html:not(.js) .at-loader { display: none; }
-  .at-loader .at-mono { color: var(--muted); }
-  .at-loader__count { font: italic 300 clamp(5rem, 16vw, 12rem)/0.9 var(--font-display); font-variant-numeric: tabular-nums; background: linear-gradient(100deg, var(--land-n), var(--land-s)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .at-loader__bar { position: absolute; left: 50%; bottom: 20%; width: min(18rem, 60vw); height: 1px; translate: -50% 0; background: linear-gradient(90deg, var(--land-n), var(--land-s)); transform: scaleX(0); }
+  /* ---- the opening: "From Kerala, outward" ----
+     Everything here is CSS and starts at first paint, so the name never waits for JavaScript or
+     WebGL (it's the LCP element). The globe's pull-back and assembly join from JS when the scene
+     is ready (src/scripts/pages/home.ts). Repeat visits in a session (html.intro-seen) get a
+     short version; reduced motion gets the end state; any input fast-forwards (html.intro-skip). */
+  @property --li { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --lf { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --gi { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --gf { syntax: "<integer>"; initial-value: 0; inherits: false; }
+  @property --sweep { syntax: "<percentage>"; initial-value: 115%; inherits: false; }
+  body.at { --t0: 0.55s; }
+  .intro { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  .intro__pin { position: absolute; left: 0; top: 0; translate: 50vw 50svh; animation: intro-out 0.5s ease-in 1.55s both; }
+  /* once the globe's own intro runs, JS rides the pin along Thrissur as the planet recedes */
+  html.intro-gl .intro__pin { animation: none; translate: none; }
+  .intro__dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 18px rgba(255, 180, 84, 0.95); animation: intro-in 0.25s ease-out backwards; }
+  .intro__dot::before, .intro__dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--accent); animation: intro-pulse 1.3s var(--ease) infinite; }
+  .intro__dot::after { animation-delay: 0.65s; }
+  .intro__coord {
+    position: absolute; left: 1.1rem; top: 0; translate: 0 -50%; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums;
+    --li: var(--to-li); --lf: var(--to-lf); --gi: var(--to-gi); --gf: var(--to-gf);
+    animation: intro-in 0.25s ease-out 0.05s backwards, intro-count 0.95s var(--ease) 0.1s backwards;
+    counter-reset: li var(--li) lf var(--lf) gi var(--gi) gf var(--gf);
+  }
+  .intro__coord::before { content: counter(li, decimal-leading-zero) "." counter(lf, decimal-leading-zero) "°" attr(data-ns) " " counter(gi, decimal-leading-zero) "." counter(gf, decimal-leading-zero) "°" attr(data-ew); }
+  @keyframes intro-count { from { --li: 0; --lf: 0; --gi: 0; --gf: 0; } }
+  @keyframes intro-in { from { opacity: 0; } }
+  @keyframes intro-out { to { opacity: 0; } }
+  @keyframes intro-pulse { from { transform: scale(1); opacity: 0.9; } to { transform: scale(4.2); opacity: 0; } }
+
+  /* the name: each character rises out of a mask while Fraunces moves from text to display optical
+     size. A hidden twin at the final settings sizes each character's box; the visible glyph sits
+     over it at zero width, so the axes can animate without moving the layout (no shift, no wrap). */
+  .in-mask { overflow: clip; white-space: nowrap; padding-bottom: 0.1em; margin-bottom: -0.1em; }
+  .ch { display: inline-block; position: relative; animation: ch-rise 1.05s var(--ease) backwards; animation-delay: calc(var(--t0) + var(--i) * 0.036s); }
+  .ch__sz { visibility: hidden; }
+  .ch__g { position: absolute; left: 50%; top: 0; translate: -50% 0; animation: ch-axes 1.05s var(--ease) backwards; animation-delay: inherit; }
+  @keyframes ch-rise { from { transform: translateY(1.02em) rotate(4deg); } }
+  @keyframes ch-axes { from { font-variation-settings: "SOFT" 50, "opsz" 9, "wght" 200; } }
+  /* "from Kerala, outward.": written in by a sweep of amber light */
+  .in-sweep {
+    background: linear-gradient(90deg, var(--accent) calc(var(--sweep) - 16%), #fff2da calc(var(--sweep) - 4%), var(--accent) var(--sweep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    mask-image: linear-gradient(90deg, #000 calc(var(--sweep) - 3%), transparent var(--sweep));
+    animation: sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) calc(var(--t0) + 0.72s) backwards;
+  }
+  @keyframes sweep { from { --sweep: -18%; } to { --sweep: 115%; } }
+  .in-kicker { animation: in-fade 0.9s ease-out calc(var(--t0) - 0.2s) backwards; }
+  /* the intro paragraph is the page's largest text (its LCP): it arrives while the name is still rising */
+  .in-up { animation: in-rise 0.9s var(--ease) calc(var(--t0) + 0.3s) backwards; }
+  /* CTAs rise through a clip (never through opacity, so their contrast is never mid-fade) */
+  .in-cta { animation: in-clip 0.9s var(--ease) calc(var(--t0) + 1.35s + var(--k) * 0.08s) backwards; }
+  .in-late { animation: in-fade 1s ease-out calc(var(--t0) + 2s) backwards; }
+  body.at .site-nav { animation: in-fade 0.9s ease-out calc(var(--t0) + 1.6s) backwards; }
+  @keyframes in-fade { from { opacity: 0; } }
+  @keyframes in-rise { from { opacity: 0; transform: translateY(14px); } }
+  @keyframes in-clip { from { clip-path: inset(0 0 100% 0 round 999px); transform: translateY(14px); } to { clip-path: inset(0 round 999px); transform: none; } }
+
+  /* repeat visit this session: a quick settle, no pin */
+  html.intro-seen body.at { --t0: 0.05s; }
+  html.intro-seen .intro { display: none; }
+  html.intro-seen .ch, html.intro-seen .ch__g { animation-duration: 0.7s; }
+  html.intro-seen .ch { animation-delay: calc(var(--t0) + var(--i) * 0.018s); }
+  html.intro-seen .in-sweep { animation-duration: 0.7s; animation-delay: 0.25s; }
+  html.intro-seen .in-up { animation-delay: 0.1s; }
+  html.intro-seen .in-cta { animation-delay: 0.45s; }
+  html.intro-seen body.at .site-nav, html.intro-seen .in-late { animation-delay: 0.3s; }
+  @media (prefers-reduced-motion: reduce) {
+    .intro { display: none; }
+    .ch, .ch__g, .in-sweep, .in-kicker, .in-up, .in-cta, .in-late, body.at .site-nav { animation: none; }
+  }
 
   /* ---- globe + labels ---- */
   .at-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; transition: opacity 0.8s; }
@@ -402,7 +475,6 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
   @media (max-width: 767px) {
     .at-hero { align-items: end; padding-top: 55svh; }
   }
-  html.js .at-hero [data-hero-in] { opacity: 0; transform: translateY(16px); }
 
   /* ---- journey ----
      Default (no JS, reduced motion, no WebGL): a readable list of passes over the globe.

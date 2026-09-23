@@ -4,10 +4,8 @@
 import { initSmooth, gsap, ScrollTrigger, lenis } from "../motion/smooth";
 import { initCursor } from "../motion/cursor";
 import { initReveals } from "../motion/reveal";
-import { runLoader } from "../motion/loader";
-import { split } from "../motion/split";
 import { reducedMotion } from "../motion/env";
-import { registerMotion } from "../atlas/motion";
+import { registerMotion, ramp, smooth } from "../atlas/motion";
 import { detectTier } from "../atlas/tier";
 import { buildLegs } from "../atlas/journey";
 import { readout } from "../atlas/ui/readout";
@@ -15,10 +13,39 @@ import { JourneyUI, type StopInfo } from "../atlas/ui/journey";
 import { Labels } from "../atlas/labels";
 import type { Director } from "../atlas/scene";
 
+/** First visit this session plays the full opening; the flag is set as soon as it starts. */
+function introKind(): "full" | "short" {
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem("jmr-intro") === "1";
+    sessionStorage.setItem("jmr-intro", "1");
+  } catch { /* storage blocked: treat as a first visit */ }
+  return seen ? "short" : "full";
+}
+
+/** Any input fast-forwards the opening (CSS reveals and the globe alike). */
+function skippable(onSkip: () => void) {
+  const skip = () => {
+    document.documentElement.classList.add("intro-skip");
+    for (const a of document.getAnimations()) {
+      if (!(a instanceof CSSAnimation) || !/^(ch-|sweep|in-|intro-)/.test(a.animationName)) continue;
+      if (a.effect?.getComputedTiming().iterations === Infinity) continue;
+      a.playbackRate = 6;
+    }
+    onSkip();
+    ["wheel", "keydown", "pointerdown", "touchstart"].forEach((ev) => removeEventListener(ev, skip));
+  };
+  ["wheel", "keydown", "pointerdown", "touchstart"].forEach((ev) => addEventListener(ev, skip, { passive: true }));
+}
+
 async function main() {
   registerMotion(gsap);
   initSmooth();
   initCursor();
+  document.documentElement.classList.add("is-loaded");
+  const kind = introKind();
+  let globeRef: Director | null = null;
+  skippable(() => globeRef?.skipIntro());
 
   const canvas = document.querySelector<HTMLCanvasElement>("[data-globe]")!;
   const labelsRoot = document.querySelector<HTMLElement>("[data-labels]")!;
@@ -36,17 +63,12 @@ async function main() {
         .catch((e) => { console.warn(e); return null; })
     : Promise.resolve(null);
 
-  // hero title lines rise in after the loader
-  const lines = rich ? [...document.querySelectorAll<HTMLElement>("[data-hero-line]")].flatMap((l) => [...split(l, "words")]) : [];
-  if (lines.length) gsap.set(lines, { yPercent: 110 });
-
-  await runLoader(document.querySelector("[data-loader]"), [], 1500);
+  // the hero's type is already rising (CSS, from first paint); the globe joins when it's ready
   const globe = await globeP;
-
-  if (lines.length) gsap.to(lines, { yPercent: 0, duration: 1.4, ease: "expo.out", stagger: 0.08 });
-  gsap.to("[data-hero-in]", { opacity: 1, y: 0, duration: 1.2, ease: "expo.out", stagger: 0.08, delay: 0.35 });
+  globeRef = globe;
 
   if (!globe) {
+    section.querySelectorAll<HTMLImageElement>("img[data-src]").forEach((img) => { img.loading = "lazy"; img.src = img.dataset.src!; });
     document.documentElement.classList.add("no-globe");
     canvas.remove();
     labelsRoot.remove();
@@ -55,7 +77,13 @@ async function main() {
     return;
   }
 
-  if (rich) gsap.fromTo(canvas, { scale: 0.94 }, { scale: 1, duration: 2, ease: "expo.out" });
+  // the opening: the full pull-back only if the pin is still on screen (the scene arrived early)
+  const late = performance.now() > 1400 || document.documentElement.classList.contains("intro-skip");
+  const glKind = !rich ? "none" : kind === "full" && !late ? "full" : "short";
+  globe.intro(glKind);
+  const pin = document.querySelector<HTMLElement>("[data-intro-pin]");
+  if (glKind === "full" && pin) document.documentElement.classList.add("intro-gl");
+  else pin?.parentElement?.remove();
   lenis?.on("scroll", () => globe.setScrollVelocity(lenis?.velocity ?? 0));
   initGlobeControl(globe);
 
@@ -88,7 +116,9 @@ async function main() {
     safeArea();
     addEventListener("resize", safeArea);
   } else {
-    // list layout: each pass cuts the globe to its stop as it reaches the middle of the screen
+    // list layout: every pass is on the page, so its photo can lazy-load natively
+    section.querySelectorAll<HTMLImageElement>("img[data-src]").forEach((img) => { img.loading = "lazy"; img.src = img.dataset.src!; });
+    // each pass cuts the globe to its stop as it reaches the middle of the screen
     section.querySelectorAll<HTMLElement>("[data-card]").forEach((card, i) => {
       ScrollTrigger.create({ trigger: card, start: "top 55%", end: "bottom 55%", onToggle: (st) => st.isActive && globe.focus(i) });
     });
@@ -97,9 +127,18 @@ async function main() {
 
   let liveAt = 0;
   globe.onFrame((d, dt) => {
+    // the intro pin rides Thrissur as the planet recedes, then hands over to the markers
+    if (pin?.isConnected) {
+      const ip = d.introProgress;
+      const p0 = d.projected[0];
+      pin.style.transform = `translate3d(${p0.x.toFixed(1)}px, ${p0.y.toFixed(1)}px, 0)`;
+      pin.style.opacity = String(1 - smooth(ramp(ip, 0.28, 0.5)));
+      if (ip >= 1) pin.parentElement?.remove();
+    }
     const w = innerWidth, h = innerHeight;
     labels.active = d.active;
     labels.reached = d.reached;
+    labels.enabled = d.introProgress > 0.88; // no labels until the planet has assembled
     labels.reserved = () => {
       const r = ui.reserved();
       if (d.mode === "hero" || d.mode === "dive") {

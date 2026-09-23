@@ -7,6 +7,8 @@ export default defineConfig({
   base: "/",
   trailingSlash: "ignore",
   devToolbar: { enabled: false },
+  // page CSS is small; inlining it removes a render-blocking request ahead of first paint
+  build: { inlineStylesheets: "always" },
   vite: {
     // pre-bundle up front so Vite never re-optimises mid-session (a stale
     // optimised dep 504s every script on the page and strands the loader)

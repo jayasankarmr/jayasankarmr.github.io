@@ -104,6 +104,23 @@ export function mixPose(a: Pose, b: Pose, t: number, out: Pose): Pose {
   return out;
 }
 
+/**
+ * The opening's pull-back: altitude climbs first (launch curve, log space), and only once the
+ * camera is high enough to keep home in frame does the target slide over to the hero framing.
+ */
+export function introPose(street: Pose, hero: Pose, p: number, out: Pose): Pose {
+  const up = ease.launch(ramp(p, 0, 0.72));
+  const slide = smooth(ramp(up, 0.6, 1));
+  out.dist = logLerp(street.dist, hero.dist, up);
+  out.lat = lerp(street.lat, hero.lat, slide);
+  out.lng = street.lng + ((((hero.lng - street.lng) % 360) + 540) % 360 - 180) * slide;
+  out.tilt = lerp(street.tilt, hero.tilt, up);
+  out.heading = angleLerp(street.heading, hero.heading, up);
+  out.sx = lerp(street.sx, hero.sx, slide);
+  out.sy = lerp(street.sy, hero.sy, slide);
+  return out;
+}
+
 /** Route state for every leg at a journey position: drawn fraction and heat (1 hot → 0 cooled). */
 export function routeState(w: Where, legs: Leg[], comet: number, out: { progress: number; heat: number }[]) {
   legs.forEach((_, k) => {

@@ -2,6 +2,9 @@
 import { Font } from "astro:assets";
 import type { CssVariable, FontPreloadFilter } from "astro:assets";
 import "../styles/base.css";
+// the shared header/footer CSS, inlined here (one render-blocking request fewer); /photography/
+// links the very same file from public/shared/
+import chromeCss from "../../public/shared/chrome.css?raw";
 
 interface Props {
   title: string;
@@ -55,7 +58,7 @@ const ogImage = new URL(image, Astro.site);
     <Font cssVariable="--font-inter" />
     <Font cssVariable="--font-instrument" />
     {selfHosted.map((f) => <Font cssVariable={f.cssVariable} preload={f.preload} />)}
-    <link rel="stylesheet" href="/shared/chrome.css" />
+    <style is:inline set:html={chromeCss}></style>
     <script is:inline src="/shared/chrome.js" defer></script>
     {fonts && <link rel="preconnect" href="https://fonts.googleapis.com" />}
     {fonts && <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />}

@@ -77,7 +77,7 @@ export class Lod {
   }
 
   /** Re-centre on the camera target; fade each level by camera distance. */
-  update(lat: number, lng: number, dist: number) {
+  update(lat: number, lng: number, dist: number, fade = 1) {
     let fine = 0;
     this.levels.forEach((L, k) => {
       // fade in below `far`; the coarse level hands over to the fine one below its `near`
@@ -86,6 +86,7 @@ export class Lod {
         const fineIn = 1 - smoothstep(0.03, this.levels[1].far, dist);
         a *= 1 - fineIn * 0.85;
       } else fine = a;
+      a *= fade;
       L.mat.uniforms.uAlpha.value = a;
       L.mesh.visible = a > 0.003;
       if (L.mesh.visible) {

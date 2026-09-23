@@ -11,8 +11,8 @@ import { Routes } from "./gl/routes";
 import { applyPose, fitDist, type Pose } from "./camera";
 import { subsolar, toVec } from "./geo";
 import { buildLegs, type Leg } from "./journey";
-import { journeyPose, landPose, mixPose, routeState, stopHeading, type Frame, type Where } from "./choreo";
-import { ease, springStep, springs } from "./motion";
+import { introPose, journeyPose, landPose, mixPose, routeState, stopHeading, type Frame, type Where } from "./choreo";
+import { clamp, ease, ramp, smooth, springStep, springs } from "./motion";
 import type { TierConfig } from "./tier";
 
 export type AtlasPlace = { lat: number; lng: number; name: string; recurring?: boolean; home?: boolean; leg?: boolean };
@@ -62,6 +62,8 @@ export class Director {
   private spinRate = 2.2; // degrees per second, westward like the real Earth seen from space
   private wave = { at: -1, x: 0, y: 0, z: 0 };
   private prevWhere: Where | null = null;
+  private introState: { p: number; active: boolean; street: Pose } | null = null;
+  private introTl?: gsap.core.Timeline;
 
   constructor(readonly canvas: HTMLCanvasElement, readonly places: AtlasPlace[], readonly tier: TierConfig) {
     this.reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -151,6 +153,42 @@ export class Director {
   setScrollVelocity(v: number) {
     this.scrollVel = v;
     if (Math.abs(v) > 0.8) this.drag.returning = true;
+  }
+
+  // ---- the opening ----
+
+  /**
+   * "From Kerala, outward": starts at street level over home (the planet's body fills the frame),
+   * then a violent pull-back to orbit while the dots stream in from the starfield — nearest to
+   * home first — and the atmosphere comes up last. "short" skips street level (repeat visits,
+   * or a scene that arrived after the opening had already played).
+   */
+  intro(kind: "full" | "short" | "none") {
+    const u = this.world.u;
+    if (kind === "none" || this.reducedMotion) {
+      u.uIntro.value = 1;
+      this.world.setAtmosphere(0.85);
+      return;
+    }
+    const h = this.places[0];
+    const hf = this.heroFrame();
+    const street: Pose = kind === "full"
+      ? { lat: h.lat, lng: h.lng, dist: 0.004, tilt: 0, heading: 0.6, sx: 0, sy: 0 }
+      : { ...this.heroPose, ...hf, dist: hf.dist * 1.7 };
+    this.introState = { p: 0, active: true, street };
+    u.uIntro.value = 0;
+    this.world.setAtmosphere(0);
+    this.introTl = gsap.timeline({ onComplete: () => { if (this.introState) this.introState.active = false; } })
+      .to(this.introState, { p: 1, duration: kind === "full" ? 2.6 : 1.4, ease: "none" });
+  }
+
+  /** Any input finishes the opening quickly (a fast-forward, not a cut). */
+  skipIntro() {
+    this.introTl?.timeScale(7);
+  }
+
+  get introProgress() {
+    return this.introState?.active ? this.introState.p : 1;
   }
 
   // ---- the list layout (reduced motion): instant cuts to a stop ----
@@ -277,6 +315,16 @@ export class Director {
     const fr = this.journeyFrame();
     if (s.heroOut <= 0 && rich && !this.drag.active) this.heroPose.lng -= this.spinRate * dt;
     Object.assign(this.heroPose, this.heroFrame());
+    const it = this.introState;
+    if (it?.active) {
+      // the pull-back takes the first ~70%, the dots land over 85%, the atmosphere comes last
+      introPose(it.street, this.heroPose, it.p, this.base);
+      this.world.u.uIntro.value = clamp(it.p / 0.85);
+      this.world.setAtmosphere(0.85 * smooth(ramp(it.p, 0.68, 1)));
+      this.routes.state.forEach((r) => { r.progress = 0; r.heat = 1; });
+      this.mode = "hero";
+      return;
+    }
     landPose(this.places[0], 0, fr, this.land0);
     let active: number;
     this.flying = -1;
@@ -347,7 +395,7 @@ export class Director {
     this.world.setStreak(0, rich ? Math.max(-40, Math.min(40, this.scrollVel * 0.9)) : 0);
 
     // close-ups: the clipmap takes over from the global dots around the target
-    this.lod.update(p.lat, p.lng, p.dist);
+    this.lod.update(p.lat, p.lng, p.dist, smooth(ramp(this.world.u.uIntro.value, 0.8, 1)));
     const t = toVec(p.lat, p.lng);
     u.uLodCenter.value.set(t[0], t[1], t[2], this.lod.radius);
     u.uLod.value = this.lod.coverage;

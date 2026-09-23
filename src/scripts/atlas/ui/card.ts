@@ -106,7 +106,7 @@ export class CardDeck {
     }
     const photo = card.querySelector<HTMLElement>("[data-photo]");
     if (photo && !photo.dataset.revealed) {
-      photo.querySelector("img")!.style.opacity = "0"; // it arrives through the dissolve, not before it
+      photo.querySelector<HTMLImageElement>("img[data-src]")!.style.opacity = "0"; // it arrives through the dissolve, not before it
       tl.call(() => void this.revealPhoto(photo), undefined, 0.5);
     }
   }
@@ -124,8 +124,8 @@ export class CardDeck {
   private async revealPhoto(fig: HTMLElement) {
     if (fig.dataset.revealed) return;
     fig.dataset.revealed = "1";
-    const img = fig.querySelector("img")!;
-    img.loading = "eager";
+    const img = fig.querySelector<HTMLImageElement>("img[data-src]")!;
+    if (!img.getAttribute("src")) img.src = img.dataset.src!;
     try {
       await img.decode();
       if (this.glPhotos) {
