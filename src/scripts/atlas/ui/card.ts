@@ -61,7 +61,11 @@ export class CardDeck {
 
   /** Show stop i. `quiet` skips the animation (intermediate stops of a rail jump). */
   show(i: number, dir: number, quiet = false) {
-    if (i === this.current) return;
+    if (i === this.current) {
+      // the first pass is current from the markup, so its photo waits for this first call
+      if (!quiet && !this.reduced) this.photoIn(this.cards[i]);
+      return;
+    }
     const prev = this.current;
     this.current = i;
     const card = this.cards[i], old = this.cards[prev];
@@ -104,11 +108,16 @@ export class CardDeck {
       }, 0.72);
       if (this.ink) tl.fromTo(this.ink, { attr: { scale: 18 } }, { attr: { scale: 2.5 }, duration: 0.9, ease: "power2.out" }, 0.72);
     }
-    const photo = card.querySelector<HTMLElement>("[data-photo]");
-    if (photo && !photo.dataset.revealed) {
-      photo.querySelector<HTMLImageElement>("img[data-src]")!.style.opacity = "0"; // it arrives through the dissolve, not before it
-      tl.call(() => void this.revealPhoto(photo), undefined, 0.5);
-    }
+    this.photoIn(card, tl);
+  }
+
+  /** Reveal the pass's photo the first time the pass is shown (on `tl`, or straight away). */
+  private photoIn(card: HTMLElement | undefined, tl?: gsap.core.Timeline) {
+    const photo = card?.querySelector<HTMLElement>("[data-photo]");
+    if (!photo || photo.dataset.revealed) return;
+    photo.querySelector<HTMLImageElement>("img[data-src]")!.style.opacity = "0"; // it arrives through the dissolve, not before it
+    if (tl) tl.call(() => void this.revealPhoto(photo), undefined, 0.5);
+    else void this.revealPhoto(photo);
   }
 
   /** The boarding-pass stub fills while the leg after stop i is flown (null: landed). */
@@ -134,7 +143,7 @@ export class CardDeck {
       } else {
         // compositor-only (opacity + transform): no per-frame repaint of a large image on a phone
         img.style.opacity = "";
-        gsap.fromTo(img, { opacity: 0, scale: 1.14, yPercent: 4 }, { opacity: 1, scale: 1, yPercent: 0, duration: 1.1, ease: "atlas.out", clearProps: "all" });
+        gsap.fromTo(img, { opacity: 0, scale: 1.14, yPercent: 4 }, { opacity: 1, scale: 1, yPercent: 0, duration: 1.1, ease: "atlas.out", clearProps: "opacity,transform" }); // not "all": that would drop the inline object-position
       }
     } catch {
       img.style.opacity = "";

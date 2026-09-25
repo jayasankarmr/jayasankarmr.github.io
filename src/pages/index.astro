@@ -182,8 +182,8 @@ const stopData = places.map((p) => ({ name: p.name, region: p.region, lat: p.lat
                       {p.photo && (
                         <figure class="pass__photo" data-photo>
                           <!-- loaded when the pass is first shown (the deck stacks every pass in one place) -->
-                          <img data-src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} decoding="async" />
-                          <noscript><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} loading="lazy" decoding="async" /></noscript>
+                          <img data-src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} style={p.photoPosition && `object-position: ${p.photoPosition}`} decoding="async" />
+                          <noscript><img src={p.photo} alt={p.photoAlt ?? `Photograph from ${p.name}`} style={p.photoPosition && `object-position: ${p.photoPosition}`} loading="lazy" decoding="async" /></noscript>
                         </figure>
                       )}
                       {p.link && <a class="pass__link at-mono" href={p.link} target="_blank" rel="noopener" tabindex="-1">See the trip ↗</a>}
